@@ -66,9 +66,10 @@ var CCFactory = dragonBones.CCFactory = cc.Class({
         this._dragonBones.advanceTime(dt);
     },
 
+    // Build new aramture with a new display.
     buildArmatureDisplay (armatureName, dragonBonesName, comp) {
         this._display = comp;
-        let armature = this.buildArmature(armatureName, dragonBonesName, comp);
+        let armature = this.buildArmature(armatureName, dragonBonesName);
         this._display = null;
         return armature;
     },
@@ -78,6 +79,9 @@ var CCFactory = dragonBones.CCFactory = cc.Class({
         return this._super(atlasJsonObj, texture);
     },
 
+    // Build sub armature from an exist armature component.
+    // It will share dragonAsset and dragonAtlasAsset.
+    // But node can not share,or will cause render error.
     createArmatureNode (comp, armatureName, node) {
         node = node || new cc.Node();
         let display = node.getComponent(dragonBones.ArmatureDisplay);
@@ -95,6 +99,9 @@ var CCFactory = dragonBones.CCFactory = cc.Class({
         return display;
     },
 
+    // When call buildArmatureDisplay,dragonBones runtime will
+    // call the function to build childArmature,it will change
+    // _display variable,so must be store in temporary value.
     _buildChildArmature (dataPackage, slot, displayData) {
         let temp = this._display;
         
