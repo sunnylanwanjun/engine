@@ -132,14 +132,18 @@ if (!CC_EDITOR || !Editor.isMainProcess) {
     require('./DragonBonesAtlasAsset');
     require('./ArmatureDisplay');
 
-    cc.game.once(cc.game.EVENT_ENGINE_INITED, function () {
-        if (cc.game.renderType === cc.game.RENDER_TYPE_CANVAS) {
-            require('./canvas-assembler');
-        }
-        else {
-            require('./webgl-assembler');
-        }
-    });
+    if (CC_JSB) {
+        require('./webgl-assembler');
+    } else {
+        cc.game.once(cc.game.EVENT_ENGINE_INITED, function () {
+            if (cc.game.renderType === cc.game.RENDER_TYPE_CANVAS) {
+                require('./canvas-assembler');
+            }
+            else {
+                require('./webgl-assembler');
+            }
+        });
+    }
 } else {
     require('./DragonBonesAsset');
     require('./DragonBonesAtlasAsset');

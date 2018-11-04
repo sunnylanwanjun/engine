@@ -133,12 +133,22 @@ let armatureAssembler = {
     traverseArmature (comp,armature,parentMat) {
         let slots = armature._slots;
 
-        let _a = parentMat && parentMat.m00 || 1,
-            _b = parentMat && parentMat.m01 || 0,
-            _c = parentMat && parentMat.m04 || 0,
-            _d = parentMat && parentMat.m05 || 1,
-            _tx = parentMat && parentMat.m12 || 0,
-            _ty = parentMat && parentMat.m13 || 0;
+        let _a,_b,_c,_d,_tx,_ty;
+        if (parentMat) {
+            _a = parentMat.m00;
+            _b = parentMat.m01;
+            _c = parentMat.m04;
+            _d = parentMat.m05;
+            _tx = parentMat.m12;
+            _ty = parentMat.m13;
+        } else {
+            _a = 1;
+            _b = 0;
+            _c = 0;
+            _d = 1;
+            _tx = 0;
+            _ty = 0;
+        }
 
         for (let i = 0, l = slots.length; i < l; i++) {
             let slot = slots[i];
