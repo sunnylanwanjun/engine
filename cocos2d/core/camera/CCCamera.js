@@ -27,6 +27,7 @@
 const AffineTrans = require('../utils/affine-transform');
 const renderEngine = require('../renderer/render-engine');
 const renderer = require('../renderer/index');
+const RenderFlow = require('../renderer/render-flow');
 const game = require('../CCGame');
 const ray = require('../3d/geom-utils/ray');
 
@@ -48,7 +49,7 @@ let _debugCamera = null;
 function repositionDebugCamera () {
     if (!_debugCamera) return;
 
-    let node = _debugCamera._node;
+    let node = _debugCamera.getNode();
     let canvas = cc.game.canvas;
     node.z = canvas.height / 1.1566;
     node.x = canvas.width / 2;
@@ -659,7 +660,7 @@ let Camera = cc.Class({
         // force update node world matrix
         this.node.getWorldMatrix(_mat4_temp_1);
         this.beforeDraw();
-        renderer._walker.visit(root);
+        RenderFlow.visit(root);
         renderer._forward.renderCamera(this._camera, renderer.scene);
     },
 

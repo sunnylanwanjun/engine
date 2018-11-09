@@ -383,6 +383,7 @@ sp.Skeleton = cc.Class({
     update (dt) {
         if (this.paused) return;
         if (CC_EDITOR) return;
+        if (this.paused) return;
         let skeleton = this._skeleton;
         let state = this._state;
         if (skeleton) {

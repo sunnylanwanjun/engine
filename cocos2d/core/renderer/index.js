@@ -24,9 +24,7 @@
  ****************************************************************************/
 
 const renderEngine = require('./render-engine');
-const math = renderEngine.math;
-
-let _pos = math.vec3.create();
+const RenderFlow = require('./render-flow');
 
 function _initBuiltins(device) {
     let defaultTexture = new renderEngine.Texture2D(device, {
@@ -92,14 +90,15 @@ cc.renderer = module.exports = {
      * @type {Number}
      */
     drawCalls: 0,
-    _walker: null,
+    // Render component handler
+    _handle: null,
     _cameraNode: null,
     _camera: null,
     _forward: null,
 
     initWebGL (canvas, opts) {
         require('./webgl/assemblers');
-        const RenderComponentWalker = require('./webgl/render-component-walker');
+        const ModelBatcher = require('./webgl/model-batcher');
 
         this.Texture2D = renderEngine.Texture2D;
 
@@ -114,31 +113,8 @@ cc.renderer = module.exports = {
         
         this.scene = new renderEngine.Scene();
 
-        this._walker = new RenderComponentWalker(this.device, this.scene);
-
-        if (CC_EDITOR) {
-            this._cameraNode = new cc.Node();
-
-            this._camera = new renderEngine.Camera();
-            this._camera.setColor(0, 0, 0, 1);
-            this._camera.setFov(Math.PI * 60 / 180);
-            this._camera.setNear(0.1);
-            this._camera.setFar(1024);
-            this._camera.setNode(this._cameraNode);
-
-            let view = new renderEngine.View();
-            this._camera.view = view;
-            this._camera.dirty = true;
-            
-            if (CC_EDITOR) {
-                this._camera.setColor(0, 0, 0, 0);
-            }
-            this._camera.setStages([
-                'transparent'
-            ]);
-            this.scene.addCamera(this._camera);
-        }
-
+        this._handle = new ModelBatcher(this.device, this.scene);
+        RenderFlow.init(this._handle);
         let builtins = _initBuiltins(this.device);
         this._forward = new renderEngine.ForwardRenderer(this.device, builtins);
     },
@@ -159,7 +135,8 @@ cc.renderer = module.exports = {
         this._camera = {
             a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0
         };
-        this._walker = new canvasRenderer.RenderComponentWalker(this.device, this._camera);
+        this._handle = new canvasRenderer.RenderComponentHandle(this.device, this._camera);
+        RenderFlow.init(this._handle);
         this._forward = new canvasRenderer.ForwardRenderer();
     },
 
@@ -178,27 +155,13 @@ cc.renderer = module.exports = {
             this._camera.tx = vp.x;
             this._camera.ty = vp.y + vp.height;
         }
-        else if (CC_EDITOR && this.canvas) {
-            let canvas = this.canvas;
-            let scaleX = cc.view.getScaleX();
-            let scaleY = cc.view.getScaleY();
-
-            let node = this._cameraNode;
-            _pos.x = node.x = canvas.width / scaleX / 2;
-            _pos.y = node.y = canvas.height / scaleY / 2;
-            _pos.z = 0;
-
-            node.z = canvas.height / scaleY / 1.1566;
-            node.lookAt(_pos);
-            this._camera.dirty = true;
-        }
     },
 
     render (ecScene) {
         this.device._stats.drawcalls = 0;
         if (ecScene) {
             // walk entity component scene to generate models
-            this._walker.visit(ecScene);
+            RenderFlow.visit(ecScene);
             // Render models in renderer scene
             this._forward.render(this.scene);
             this.drawCalls = this.device._stats.drawcalls;
@@ -206,7 +169,7 @@ cc.renderer = module.exports = {
     },
 
     clear () {
-        this._walker.reset();
+        this._handle.reset();
         this._forward._reset();
     }
 };
