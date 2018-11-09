@@ -290,6 +290,7 @@ let ArmatureDisplay = cc.Class({
     },
 
     ctor () {
+        this._renderDatas = [];
         this._inited = false;
         this._factory = dragonBones.CCFactory.getInstance();
     },
@@ -329,6 +330,7 @@ let ArmatureDisplay = cc.Class({
             this._armature.dispose();
             this._armature = null;
         }
+        this._renderDatas.length = 0;
     },
 
     _initDebugDraw () {
@@ -373,8 +375,7 @@ let ArmatureDisplay = cc.Class({
     _buildArmature () {
         if (!this.dragonAsset || !this.dragonAtlasAsset || !this.armatureName) return;
 
-        let factory = dragonBones.CCFactory.getInstance();
-        this._armature = factory.buildArmatureDisplay(this.armatureName, this.dragonAsset._dragonBonesData.name, this);
+        this._armature = this._factory.buildArmatureDisplay(this.armatureName, this.dragonAsset._dragonBonesData.name, this);
         this._armature.animation.timeScale = this.timeScale;
 
         if (this.animationName) {
@@ -533,7 +534,7 @@ let ArmatureDisplay = cc.Class({
      * @return {dragonBones.ArmatureDisplay}
      */
     buildArmature (armatureName, node) {
-        return dragonBones.CCFactory.getInstance().createArmatureNode(this, armatureName, node);
+        return this._factory.createArmatureNode(this, armatureName, node);
     },
 
     /**

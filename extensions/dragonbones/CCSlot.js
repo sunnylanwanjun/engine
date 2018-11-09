@@ -66,17 +66,16 @@ dragonBones.CCSlot = cc.Class({
 
     _addDisplay () {
         this._visible = true;
-
-        if (!CC_EDITOR) {
-            this._rawDisplay.parent = this._armature.display.node;
-        }
     },
 
+    // When build childArmature,the function will be call by dragonBones
+    // runtime.And here must association to the parent display node,
+    // or when you call the childArmature node's converToWorldSpace
+    // function,you will get error value.
     _replaceDisplay (value) {
         if (value instanceof dragonBones.ArmatureDisplay) {
             value.node.parent = null;
         }
-        
         if (this._display instanceof dragonBones.ArmatureDisplay) {
             this._display.node.parent = this._armature.display.node;
         }
@@ -84,14 +83,9 @@ dragonBones.CCSlot = cc.Class({
 
     _removeDisplay () {
         this._visible = false;
-
-        if (!CC_EDITOR) {
-            this._rawDisplay.parent = null;
-        }
     },
 
     _disposeDisplay (object) {
-
     },
 
     _updateVisible () {
@@ -101,26 +95,7 @@ dragonBones.CCSlot = cc.Class({
     },
 
     _updateBlendMode () {
-        // TODO: new implementation needed
-        return;
-        if (this._renderDisplay instanceof cc.Scale9Sprite) {
-            switch (this._blendMode) {
-            case 0: // BlendMode Normal
-                break;
-            case 1: // BlendMode Add
-                let texture = this._renderDisplay._spriteFrame.getTexture();
-                if (texture && texture.hasPremultipliedAlpha()) {
-                    this._renderDisplay.setBlendFunc(BlendFactor.ONE, BlendFactor.ONE);
-                }
-                else {
-                    this._renderDisplay.setBlendFunc(BlendFactor.SRC_ALPHA, BlendFactor.ONE);
-                }
-                break;
-            default:
-                break;
-            }
-        }
-        else if (this._childArmature) {
+        if (this._childArmature) {
             let childSlots = this._childArmature.getSlots();
             for (let i = 0, l = childSlots.length; i < l; i++) {
                 let slot = childSlots[i];
@@ -138,6 +113,11 @@ dragonBones.CCSlot = cc.Class({
         c.a = this._colorTransform.alphaMultiplier * 255;
     },
 
+    //return dragonBones.CCTexture2D
+    getTexture(){
+        return this._textureData && this._textureData.spriteFrame && this._textureData.spriteFrame.getTexture();
+    },
+
     _updateFrame () {
         this._vertices.length = 0;
         this._indices.length = 0;
@@ -153,7 +133,7 @@ dragonBones.CCSlot = cc.Class({
 
         // update the frame
         if (!this._display || this._displayIndex < 0 || !currentTextureData) return;
-        let currentDisplayData = this._displayIndex < this.rawDisplayDatas.length ? this.rawDisplayDatas[this._displayIndex] : null;;
+        let currentDisplayData = this._displayIndex < this.rawDisplayDatas.length ? this.rawDisplayDatas[this._displayIndex] : null;
 
         let textureAtlas = this._armature._replacedTexture || currentTextureData.parent.renderTexture;
         if (textureAtlas && (!currentTextureData.spriteFrame || currentTextureData.spriteFrame.getTexture() !== textureAtlas)) {
@@ -188,8 +168,8 @@ dragonBones.CCSlot = cc.Class({
             const uvOffset = vertexOffset + vertexCount * 2;
 
             for (let i = 0, l = vertexCount; i < l; i++) {
-                let x = floatArray[vertexOffset + i*2];
-                let y = -floatArray[vertexOffset + i*2 + 1]; 
+                let x = floatArray[vertexOffset + i*2] * scale;
+                let y = -floatArray[vertexOffset + i*2 + 1] * scale;  
 
                 let u = (region.x + floatArray[uvOffset + i*2] * region.width) / textureAtlasWidth;
                 let v = (region.y + floatArray[uvOffset + i*2 + 1] * region.height) / textureAtlasHeight;
@@ -349,6 +329,10 @@ dragonBones.CCSlot = cc.Class({
         t.m12 = this.globalTransformMatrix.tx - (this.globalTransformMatrix.a * this._pivotX + this.globalTransformMatrix.c * this._pivotY);
         t.m13 = -(this.globalTransformMatrix.ty - (this.globalTransformMatrix.b * this._pivotX + this.globalTransformMatrix.d * this._pivotY));
 
+        // If this slot is a container,then update node's local 
+        // transform,when call the node's convertToWorldSpace
+        // will correct,or will error.Because the _matrix is 
+        // dragonbone set childArmature transform.
         if (this._display instanceof dragonBones.ArmatureDisplay) {
             let node = this._display.node;
             math.mat4.copy(node._matrix, t);
