@@ -100,7 +100,6 @@ let _vertexOffset, _indiceOffset,
 
 let armatureAssembler = {
     updateRenderData (comp) {
-        if(CC_EDITOR)return;
 
         let armature = comp._armature;
         if (!armature || comp._isChildArmature) {

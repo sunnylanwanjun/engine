@@ -2379,11 +2379,11 @@ let NodeDefines = {
     /*
      * Calculate and return world position.
      * This is not a public API yet, its usage could be updated
-     * @method getWorldPosition
+     * @method getWorldPos
      * @param {Vec3} out
      * @return {Vec3}
      */
-    getWorldPosition (out) {
+    getWorldPos (out) {
         math.vec3.copy(out, this._position);
         let curr = this._parent;
         while (curr) {
@@ -2401,10 +2401,10 @@ let NodeDefines = {
     /*
      * Set world position.
      * This is not a public API yet, its usage could be updated
-     * @method setWorldPosition
+     * @method setWorldPos
      * @param {Vec3} pos
      */
-    setWorldPosition (pos) {
+    setWorldPos (pos) {
         if (CC_EDITOR) {
             var oldPosition = new cc.Vec3(this._position);
         }
@@ -2432,11 +2432,11 @@ let NodeDefines = {
     /*
      * Calculate and return world rotation
      * This is not a public API yet, its usage could be updated
-     * @method getWorldRotation
+     * @method getWorldRot
      * @param {Quat} out
      * @return {Quat}
      */
-    getWorldRotation (out) {
+    getWorldRot (out) {
         math.quat.copy(out, this._quat);
         let curr = this._parent;
         while (curr) {
@@ -2449,12 +2449,12 @@ let NodeDefines = {
     /*
      * Set world rotation with quaternion
      * This is not a public API yet, its usage could be updated
-     * @method setWorldRotation
+     * @method setWorldRot
      * @param {Quat} rot
      */
-    setWorldRotation (quat) {
+    setWorldRot (quat) {
         if (this._parent) {
-            this._parent.getWorldRotation(this._quat);
+            this._parent.getWorldRot(this._quat);
             math.quat.conjugate(this._quat, this._quat);
             math.quat.mul(this._quat, this._quat, quat);
         }
@@ -2494,12 +2494,12 @@ let NodeDefines = {
      * @param {Vec3} [up] - default is (0,1,0)
      */
     lookAt (pos, up) {
-        this.getWorldPosition(_vec3_temp);
+        this.getWorldPos(_vec3_temp);
         math.vec3.sub(_vec3_temp, _vec3_temp, pos); // NOTE: we use -z for view-dir
         math.vec3.normalize(_vec3_temp, _vec3_temp);
         math.quat.fromViewUp(_quat_temp, _vec3_temp, up);
     
-        this.setWorldRotation(_quat_temp);
+        this.setWorldRot(_quat_temp);
     },
 
     _updateLocalMatrix () {

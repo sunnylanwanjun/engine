@@ -56,10 +56,17 @@ var CCFactory = dragonBones.CCFactory = cc.Class({
     ctor () {
         this._dragonBones = new dragonBones.DragonBones();
 
-        if (!CC_EDITOR && cc.director._scheduler) {
-            cc.director._scheduler.enableForTarget(this);
-            cc.director._scheduler.scheduleUpdate(this, cc.Scheduler.PRIORITY_SYSTEM, false);
+        if (!CC_JSB && !CC_EDITOR && cc.director._scheduler) {
+            cc.game.on(cc.game.EVENT_RESTART, function () {
+                this.initUpdate();
+            }.bind(this));
+            this.initUpdate();
         }
+    },
+
+    initUpdate (dt) {
+        cc.director._scheduler.enableForTarget(this);
+        cc.director._scheduler.scheduleUpdate(this, cc.Scheduler.PRIORITY_SYSTEM, false);
     },
 
     update (dt) {
