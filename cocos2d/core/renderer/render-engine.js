@@ -3,7 +3,7 @@
  Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
  render-engine v1.2.0
- http://www.cocos.com
+ https://www.cocos.com/
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated engine source code (the "Software"), a limited,
@@ -4012,13 +4012,51 @@ quat.fromEuler = function (out, x, y, z) {
   var sz = Math.sin(z);
   var cz = Math.cos(z);
 
-  out.x = sx * cy * cz - cx * sy * sz;
+  out.x = sx * cy * cz + cx * sy * sz;
   out.y = cx * sy * cz + sx * cy * sz;
   out.z = cx * cy * sz - sx * sy * cz;
-  out.w = cx * cy * cz + sx * sy * sz;
+  out.w = cx * cy * cz - sx * sy * sz;
 
   return out;
 };
+
+/**
+ * Convert a quaternion back to euler angle (in degrees).
+ *
+ * @param {vec3} out - Euler angle stored as a vec3
+ * @param {number} q - the quaternion to be converted
+ * @returns {vec3} out.
+ */
+quat.toEuler = function (out, q) {
+  var x = q.x, y = q.y, z = q.z, w = q.w;
+  var heading, attitude, bank;
+  var test = x * y + z * w;
+  if (test > 0.499) { // singularity at north pole
+    heading = 2 * Math.atan2(x,w);
+    attitude = Math.PI/2;
+    bank = 0;
+  }
+  if (test < -0.499) { // singularity at south pole
+    heading = -2 * Math.atan2(x,w);
+    attitude = - Math.PI/2;
+    bank = 0;
+  }
+  if(isNaN(heading)){
+    var sqx = x*x;
+    var sqy = y*y;
+    var sqz = z*z;
+    heading = Math.atan2(2*y*w - 2*x*z , 1 - 2*sqy - 2*sqz); // heading
+    attitude = Math.asin(2*test); // attitude
+    bank = Math.atan2(2*x*w - 2*y*z , 1 - 2*sqx - 2*sqz); // bank
+  }
+
+  out.y = toDegree(heading);
+  out.z = toDegree(attitude);
+  out.x = toDegree(bank);
+
+  return out;
+}
+
 
 /**
  * Returns a string representation of a quatenion
@@ -11315,7 +11353,7 @@ Camera.prototype.screenToWorld = function screenToWorld (out, screenPos, width, 
     vec3.transformMat4(out, out, _matInvViewProj);
 
     //
-    this._node.getWorldPos(_tmp_v3);
+    this._node.getWorldPosition(_tmp_v3);
     vec3.lerp(out, _tmp_v3, out, cc.vmath.lerp(this._near / this._far, 1, screenPos.z));
   } else {
     vec3.set(out,
