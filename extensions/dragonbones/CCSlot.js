@@ -33,16 +33,16 @@ dragonBones.CCSlot = cc.Class({
     extends: dragonBones.Slot,
 
     ctor () {
-        this._vertices = [];
         this._localVertices = [];
         this._indices = [];
         this._matrix = math.mat4.create();
+        this._worldMatrix = math.mat4.create();
+        this._worldMatrixDirty = true;
         this._visible = false;
         this._color = cc.color();
     },
 
     reset () {
-        this._vertices.length = 0;
         this._localVertices.length = 0;
         this._indices.length = 0;
         math.mat4.identity(this._matrix);
@@ -56,9 +56,7 @@ dragonBones.CCSlot = cc.Class({
     },
 
     _onUpdateDisplay () {
-        if (this._childArmature) {
-            this._childArmature.display._isChildArmature = true;
-        }
+        
     },
 
     _initDisplay (value) {
@@ -68,17 +66,8 @@ dragonBones.CCSlot = cc.Class({
         this._visible = true;
     },
 
-    // When build childArmature,the function will be call by dragonBones
-    // runtime.And here must association to the parent display node,
-    // or when you call the childArmature node's converToWorldSpace
-    // function,you will get error value.
     _replaceDisplay (value) {
-        if (value instanceof dragonBones.ArmatureDisplay) {
-            value.node.parent = null;
-        }
-        if (this._display instanceof dragonBones.ArmatureDisplay) {
-            this._display.node.parent = this._armature.display.node;
-        }
+
     },
 
     _removeDisplay () {
@@ -119,13 +108,10 @@ dragonBones.CCSlot = cc.Class({
     },
 
     _updateFrame () {
-        this._vertices.length = 0;
         this._indices.length = 0;
-        let vertices = this._vertices,
-            indices = this._indices,
+        let indices = this._indices,
             localVertices = this._localVertices;
 
-        vertices.length = 0;
         indices.length = 0;
         localVertices.length = 0;
 
@@ -174,8 +160,7 @@ dragonBones.CCSlot = cc.Class({
                 let u = (region.x + floatArray[uvOffset + i*2] * region.width) / textureAtlasWidth;
                 let v = (region.y + floatArray[uvOffset + i*2 + 1] * region.height) / textureAtlasHeight;
 
-                vertices.push({ x, y, u, v});
-                localVertices.push({ x, y});
+                localVertices.push({ x, y, u, v});
             }
 
             for (let i = 0; i < triangleCount * 3; ++i) {
@@ -209,7 +194,6 @@ dragonBones.CCSlot = cc.Class({
             this._pivotY -= region.height * scale;
             
             for (let i = 0; i < 4; i++) {
-                vertices.push({});
                 localVertices.push({});
             }
 
@@ -217,15 +201,15 @@ dragonBones.CCSlot = cc.Class({
             let b = (region.y + region.height) / textureAtlasHeight;
             let r = (region.x + region.width) / textureAtlasWidth;
             let t = region.y / textureAtlasHeight;
-            vertices[0].u = l; vertices[0].v = b;
-            vertices[1].u = r; vertices[1].v = b;
-            vertices[2].u = l; vertices[2].v = t;
-            vertices[3].u = r; vertices[3].v = t;
+            localVertices[0].u = l; localVertices[0].v = b;
+            localVertices[1].u = r; localVertices[1].v = b;
+            localVertices[2].u = l; localVertices[2].v = t;
+            localVertices[3].u = r; localVertices[3].v = t;
 
-            localVertices[0].x = localVertices[2].x = vertices[0].x = vertices[2].x = 0;
-            localVertices[1].x = localVertices[3].x = vertices[1].x = vertices[3].x = region.width;
-            localVertices[0].y = localVertices[1].y = vertices[0].y = vertices[1].y = 0;
-            localVertices[2].y = localVertices[3].y = vertices[2].y = vertices[3].y = region.height;
+            localVertices[0].x = localVertices[2].x = 0;
+            localVertices[1].x = localVertices[3].x = region.width;
+            localVertices[0].y = localVertices[1].y = 0;
+            localVertices[2].y = localVertices[3].y = region.height;
 
             indices[0] = 0;
             indices[1] = 1;
@@ -317,7 +301,6 @@ dragonBones.CCSlot = cc.Class({
             }
         }
 
-        this._updateVertices();
     },
 
     _updateTransform () {
@@ -329,32 +312,38 @@ dragonBones.CCSlot = cc.Class({
         t.m12 = this.globalTransformMatrix.tx - (this.globalTransformMatrix.a * this._pivotX + this.globalTransformMatrix.c * this._pivotY);
         t.m13 = -(this.globalTransformMatrix.ty - (this.globalTransformMatrix.b * this._pivotX + this.globalTransformMatrix.d * this._pivotY));
 
-        // If this slot is a container,then update node's local 
-        // transform,when call the node's convertToWorldSpace
-        // will correct,or will error.Because the _matrix is 
-        // dragonbone set childArmature transform.
-        if (this._display instanceof dragonBones.ArmatureDisplay) {
-            let node = this._display.node;
-            math.mat4.copy(node._matrix, t);
-            node._localMatDirty = false;
-            node.setWorldDirty();
-        }
-
-        this._updateVertices();
+        this._worldMatrixDirty = true;
     },
 
-    _updateVertices () {
-        let t = this._matrix;
-        let a = t.m00, b = t.m01, c = t.m04, d = t.m05, tx = t.m12, ty = t.m13;
+    updateWorldMatrix () {
+        if (!this._armature) return;
 
-        let vertices = this._vertices;
-        let localVertices = this._localVertices;
-        for (let i = 0, l = vertices.length; i < l; i++) {
-            let x = localVertices[i].x;
-            let y = localVertices[i].y;
-
-            vertices[i].x = a * x + c * y + tx;
-            vertices[i].y = b * x + d * y + ty;
+        var parentSlot = this._armature._parent;
+        if (parentSlot) {
+            parentSlot.updateWorldMatrix();
         }
+
+        if (this._worldMatrixDirty) {
+            this.calculWorldMatrix();
+            var childArmature = this.childArmature;
+            if (!childArmature) return;
+            var slots = childArmature.getSlots();
+            for (var i = 0,n = slots.length; i < n; i++) {
+                var slot = slots[i];
+                if (slot) {
+                    slot._worldMatrixDirty = true;
+                }
+            }
+        }
+    },
+
+    calculWorldMatrix () {
+        var parent = this._armature._parent;
+        if (parent) {
+            cc.Node.prototype._mulMat(this._worldMatrix,parent._worldMatrix,this._matrix);
+        } else {
+            math.mat4.copy(this._worldMatrix, this._matrix);
+        }
+        this._worldMatrixDirty = false;
     }
 });

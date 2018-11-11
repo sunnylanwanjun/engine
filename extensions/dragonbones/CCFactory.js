@@ -23,7 +23,8 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-let BaseObject = dragonBones.BaseObject;
+let BaseObject = dragonBones.BaseObject,
+    BaseFactory = dragonBones.BaseFactory;
 
 /**
  * @module dragonBones
@@ -35,7 +36,7 @@ let BaseObject = dragonBones.BaseObject;
 */
 var CCFactory = dragonBones.CCFactory = cc.Class({
     name: 'dragonBones.CCFactory',
-    extends: dragonBones.BaseFactory,
+    extends: BaseFactory,
     /**
      * @method getInstance
      * @return {CCFactory}
@@ -73,12 +74,37 @@ var CCFactory = dragonBones.CCFactory = cc.Class({
         this._dragonBones.advanceTime(dt);
     },
 
+    parseDragonBonesDataOnly (rawData, name, scale) {
+        if (name === void 0) { name = null; }
+        if (scale === void 0) { scale = 1.0; }
+        var dataParser = rawData instanceof ArrayBuffer ? BaseFactory._binaryParser : this._dataParser;
+        var dragonBonesData = dataParser.parseDragonBonesData(rawData, scale);
+        return dragonBonesData;
+    },
+
+    handleTextureAtlasData (rawData, name, scale) {
+
+        if (name === void 0) { name = null; }
+        if (scale === void 0) { scale = 1.0; }
+
+        var dataParser = rawData instanceof ArrayBuffer ? BaseFactory._binaryParser : this._dataParser;
+
+        while (true) {
+            var textureAtlasData = this._buildTextureAtlasData(null, null);
+            if (dataParser.parseTextureAtlasData(null, textureAtlasData, scale)) {
+                this.addTextureAtlasData(textureAtlasData, name);
+            }
+            else {
+                textureAtlasData.returnToPool();
+                break;
+            }
+        }
+    },
+
     // Build new aramture with a new display.
-    buildArmatureDisplay (armatureName, dragonBonesName, comp) {
-        this._display = comp;
+    buildArmatureDisplay (armatureName, dragonBonesName) {
         let armature = this.buildArmature(armatureName, dragonBonesName);
-        this._display = null;
-        return armature;
+        return armature && armature._display;
     },
 
     parseTextureAtlasData (jsonString, texture) {
@@ -105,26 +131,7 @@ var CCFactory = dragonBones.CCFactory = cc.Class({
 
         return display;
     },
-
-    // When call buildArmatureDisplay,dragonBones runtime will
-    // call the function to build childArmature,it will change
-    // _display variable,so must be store in temporary value.
-    _buildChildArmature (dataPackage, slot, displayData) {
-        let temp = this._display;
-        
-        let name = 'CHILD_ARMATURE-' + displayData.path;
-        let node = this._display.node.getChildByName(name);
-        if (!node) {
-            node = new cc.Node();
-        }
-        let display = this.createArmatureNode(temp, displayData.path, node);
-        node.name = name;
-
-        this._display = temp;
-        return display._armature;
-    },
     
-
     _buildTextureAtlasData (textureAtlasData, textureAtlas) {
         if (textureAtlasData) {
             textureAtlasData.renderTexture = textureAtlas;
@@ -169,8 +176,10 @@ var CCFactory = dragonBones.CCFactory = cc.Class({
         // fixed dragonbones sort issue
         // armature._sortSlots = this._sortSlots;
 
+        var display = new dragonBones.CCArmatureDisplay();
+
         armature.init(dataPackage.armature,
-            this._display, this._display, this._dragonBones
+            display, display, this._dragonBones
         );
         
         return armature;
@@ -178,13 +187,9 @@ var CCFactory = dragonBones.CCFactory = cc.Class({
 
     _buildSlot (dataPackage, slotData, displays) {
         let slot = BaseObject.borrowObject(dragonBones.CCSlot);
-        let displayList = [];
 
         slot.name = slotData.name;
         slot.reset();
-
-        // let display = new cc.Node();
-        // display.name = slot.name;
 
         let display = slot;
         slot.init(slotData, displays, display, display);

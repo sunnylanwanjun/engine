@@ -31,7 +31,9 @@ const js = require('../../cocos2d/core/platform/js');
 const RenderFlow = require('../../cocos2d/core/renderer/render-flow');
 const gfx = renderEngine.gfx;
 const SpriteMaterial = renderEngine.SpriteMaterial;
-let _matrix = math.mat4.create();
+
+let _boneColor = cc.color(255, 0, 0, 255);
+let _slotColor = cc.color(0, 0, 255, 255);
 
 const STENCIL_SEP = '@';
 let _sharedMaterials = {};
@@ -102,7 +104,7 @@ let armatureAssembler = {
     updateRenderData (comp) {
 
         let armature = comp._armature;
-        if (!armature || comp._isChildArmature) {
+        if (!armature) {
             return;
         }
 
@@ -129,43 +131,21 @@ let armatureAssembler = {
         this.traverseArmature(comp,armature);
     },
 
-    traverseArmature (comp,armature,parentMat) {
+    traverseArmature (comp,armature) {
         let slots = armature._slots;
-
-        let _a,_b,_c,_d,_tx,_ty;
-        if (parentMat) {
-            _a = parentMat.m00;
-            _b = parentMat.m01;
-            _c = parentMat.m04;
-            _d = parentMat.m05;
-            _tx = parentMat.m12;
-            _ty = parentMat.m13;
-        } else {
-            _a = 1;
-            _b = 0;
-            _c = 0;
-            _d = 1;
-            _tx = 0;
-            _ty = 0;
-        }
 
         for (let i = 0, l = slots.length; i < l; i++) {
             let slot = slots[i];
             if (!slot._visible || !slot._displayData) continue;
+
+            slot.updateWorldMatrix();
 
             // If slot has childArmature,then the slot has no 
             // vertices and indice info.It only has sub slots
             // transform info,so multiply the slot's transform 
             // with parent transform and give the sub slots.
             if (slot.childArmature) {
-
-                if (parentMat) {
-                    math.mat4.mul(_matrix, parentMat, slot._matrix);
-                } else {
-                    math.mat4.copy(_matrix, slot._matrix);
-                }
-                
-                this.traverseArmature(comp,slot.childArmature,_matrix);
+                this.traverseArmature(comp,slot.childArmature);
                 continue;
             }
 
@@ -212,21 +192,22 @@ let armatureAssembler = {
                 indiceBuffer[_indiceOffset++] = _vertexOffset + indices[j];
             }
 
-            let vertices = slot._vertices;
+            let vertices = slot._localVertices;
             let slotColor = slot._color;
+            let worldMatrix = slot._worldMatrix;
             let cr = slotColor.r * _nodeR;
             let cg = slotColor.g * _nodeG;
             let cb = slotColor.b * _nodeB;
             let ca = slotColor.a * _nodeA;
             let color = ((ca<<24) >>> 0) + (cb<<16) + (cg<<8) + cr;
-            
+
             let vertexBuffer = _data._data;
             _data.dataLength += vertices.length;
             for (let j = 0, vl = vertices.length; j < vl; j++) {
                 let vertex = vertices[j];
                 let content = vertexBuffer[_vertexOffset++];
-                content.x = vertex.x * _a + vertex.y * _c + _tx;
-                content.y = vertex.x * _b + vertex.y * _d + _ty;
+                content.x = vertex.x * worldMatrix.m00 + vertex.y * worldMatrix.m04 + worldMatrix.m12;
+                content.y = vertex.x * worldMatrix.m01 + vertex.y * worldMatrix.m05 + worldMatrix.m13;
                 content.u = vertex.u;
                 content.v = vertex.v;
                 content.color = color;
@@ -246,8 +227,9 @@ let armatureAssembler = {
     },
 
     fillBuffers (comp, renderer) {
+
         let armature = comp._armature;
-        if (!armature || comp._isChildArmature) return;
+        if (!armature) return;
 
         let renderDatas = comp._renderDatas;
         for (let index = 0, length = renderDatas.length; index < length; index++) {
@@ -300,6 +282,30 @@ let armatureAssembler = {
             // index buffer
             for (let i = 0, l = indices.length; i < l; i ++) {
                 ibuf[indiceOffset++] = vertexId + indices[i];
+            }
+        }
+
+        if (comp._debugBones && comp._debugDraw) {
+
+            var graphics = comp._debugDraw;
+            graphics.clear();
+
+            graphics.lineWidth = 5;
+            graphics.strokeColor = _boneColor;
+            graphics.fillColor = _slotColor; // Root bone color is same as slot color.
+
+            let bones = armature.getBones();
+            for (let i = 0, l = bones.length; i < l; i++) {
+                let bone =  bones[i];
+                let boneLength = Math.max(bone.boneData.length, 5);
+                let startX = bone.globalTransformMatrix.tx;
+                let startY = -bone.globalTransformMatrix.ty;
+                let endX = startX + bone.globalTransformMatrix.a * boneLength;
+                let endY = startY - bone.globalTransformMatrix.b * boneLength;
+
+                graphics.moveTo(startX, startY);
+                graphics.lineTo(endX, endY);
+                graphics.stroke();
             }
         }
 
