@@ -82,12 +82,12 @@ var CCFactory = dragonBones.CCFactory = cc.Class({
         return dragonBonesData;
     },
 
-    handleTextureAtlasData (rawData, name, scale) {
+    handleTextureAtlasData (isBinary, name, scale) {
 
         if (name === void 0) { name = null; }
         if (scale === void 0) { scale = 1.0; }
 
-        var dataParser = rawData instanceof ArrayBuffer ? BaseFactory._binaryParser : this._dataParser;
+        var dataParser = isBinary ? BaseFactory._binaryParser : this._dataParser;
 
         while (true) {
             var textureAtlasData = this._buildTextureAtlasData(null, null);

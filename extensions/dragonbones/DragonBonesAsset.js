@@ -106,9 +106,9 @@ var DragonBonesAsset = cc.Class({
         }
         else {
             if (this.dragonBonesJson) {
-                this.initWithRawData(JSON.parse(this.dragonBonesJson));
+                this.initWithRawData(JSON.parse(this.dragonBonesJson), false);
             } else {
-                this.initWithRawData(this._nativeAsset);
+                this.initWithRawData(this._nativeAsset, true);
             }
         }
     },
@@ -130,7 +130,7 @@ var DragonBonesAsset = cc.Class({
         return false;
     },
 
-    initWithRawData (rawData) {
+    initWithRawData (rawData, isBinary) {
         if (!rawData) {
             return;
         }
@@ -139,7 +139,7 @@ var DragonBonesAsset = cc.Class({
         let hasSame = this.checkSameNameData(dragonBonesData);
         if (!hasSame) {
             this._dragonBonesData = dragonBonesData;
-            this._factory.handleTextureAtlasData(rawData);
+            this._factory.handleTextureAtlasData(isBinary);
             this._factory.addDragonBonesData(dragonBonesData);
         }
     },
