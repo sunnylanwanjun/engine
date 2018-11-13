@@ -340,7 +340,7 @@ dragonBones.CCSlot = cc.Class({
     calculWorldMatrix () {
         var parent = this._armature._parent;
         if (parent) {
-            cc.Node.prototype._mulMat(this._worldMatrix,parent._worldMatrix,this._matrix);
+            cc.Node.prototype._mulMat(this._worldMatrix ,parent._worldMatrix, this._matrix);
         } else {
             math.mat4.copy(this._worldMatrix, this._matrix);
         }
