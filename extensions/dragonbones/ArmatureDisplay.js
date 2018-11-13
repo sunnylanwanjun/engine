@@ -293,6 +293,7 @@ let ArmatureDisplay = cc.Class({
 
     ctor () {
         this._renderDatas = [];
+        this._materialList = {};
         this._inited = false;
         this._factory = dragonBones.CCFactory.getInstance();
     },

@@ -26,8 +26,6 @@
 const StencilManager = require('../../cocos2d/core/renderer/webgl/stencil-manager').sharedManager;
 const Armature = require('./ArmatureDisplay');
 const renderEngine = require('../../cocos2d/core/renderer/render-engine');
-const math = renderEngine.math;
-const js = require('../../cocos2d/core/platform/js');
 const RenderFlow = require('../../cocos2d/core/renderer/render-flow');
 const gfx = renderEngine.gfx;
 const SpriteMaterial = renderEngine.SpriteMaterial;
@@ -36,13 +34,12 @@ let _boneColor = cc.color(255, 0, 0, 255);
 let _slotColor = cc.color(0, 0, 255, 255);
 
 const STENCIL_SEP = '@';
-let _sharedMaterials = {};
 
 function _updateKeyWithStencilRef (key, stencilRef) {
     return key.replace(/@\d+$/, STENCIL_SEP + stencilRef);
 }
 
-function _getSlotMaterial (slot, premultiAlpha) {
+function _getSlotMaterial (materialList, slot, premultiAlpha) {
     premultiAlpha = premultiAlpha || false;
     let tex = slot.getTexture();
     if(!tex)return null;
@@ -69,7 +66,7 @@ function _getSlotMaterial (slot, premultiAlpha) {
     }
 
     let key = tex.url + src + dst + STENCIL_SEP + '0';
-    let material = _sharedMaterials[key];
+    let material = materialList[key];
     if (!material) {
         material = new SpriteMaterial();
         material.useModel = true;
@@ -85,7 +82,7 @@ function _getSlotMaterial (slot, premultiAlpha) {
             gfx.BLEND_FUNC_ADD,
             src, dst
         );
-        _sharedMaterials[key] = material;
+        materialList[key] = material;
         material.updateHash(key);
     }
     else if (material.texture !== tex) {
@@ -149,7 +146,7 @@ let armatureAssembler = {
                 continue;
             }
 
-            _material = _getSlotMaterial(slot);
+            _material = _getSlotMaterial(comp._materialList, slot);
             if (!_material) {
                 continue;
             }
@@ -232,16 +229,18 @@ let armatureAssembler = {
         if (!armature) return;
 
         let renderDatas = comp._renderDatas;
+        let materialList = comp._materialList;
+
         for (let index = 0, length = renderDatas.length; index < length; index++) {
             let data = renderDatas[index];
 
             let key = data.material._hash;
             let newKey = _updateKeyWithStencilRef(key, StencilManager.getStencilRef());
             if (key !== newKey) {
-                data.material = _sharedMaterials[newKey] || data.material.clone();
+                data.material = materialList[newKey] || data.material.clone();
                 data.material.updateHash(newKey);
-                if (!_sharedMaterials[newKey]) {
-                    _sharedMaterials[newKey] = data.material;
+                if (!materialList[newKey]) {
+                    materialList[newKey] = data.material;
                 }
             }
 
