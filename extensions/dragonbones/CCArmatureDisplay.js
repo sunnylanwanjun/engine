@@ -30,6 +30,7 @@ dragonBones.CCArmatureDisplay = cc.Class({
     mixins: [EventTarget],
 
     properties: {
+        // adapt to old api
         node: {
             get: function () {
                 return this;
