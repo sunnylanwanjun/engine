@@ -29,7 +29,7 @@ let CCNode = require('../../cocos2d/core/CCNode');
 dragonBones.CCArmatureDisplay = cc.Class({
     name: 'dragonBones.CCArmatureDisplay',
     // mix CCNode for adapt old api
-    mixins: [EventTarget,CCNode],
+    mixins: [EventTarget, CCNode],
 
     properties: {
         // adapt old api
@@ -77,7 +77,6 @@ dragonBones.CCArmatureDisplay = cc.Class({
     convertToWorldSpace (point) {
         var newPos = this.convertToRootSpace(point);
         var ccNode = this.getRootNode();
-        if (!ccNode) return newPos;
         var finalPos = ccNode.convertToWorldSpace(newPos);
         return finalPos;
     },

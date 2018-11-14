@@ -315,21 +315,6 @@ sp.Skeleton = cc.Class({
                 this._initDebugDraw();
             }
         },
-
-        // override _material property,return first material,
-        // adapt to ModelBatcher
-        _material: {
-            get () {
-                for (var key in this._materials) {
-                    return this._materials[key];
-                }
-                return this._tempMaterial;
-            },
-            // shield change _material property
-            set () {
-                // do nothing
-            }
-        }
     },
 
     // CONSTRUCTOR
@@ -338,10 +323,16 @@ sp.Skeleton = cc.Class({
         this._rootBone = null;
         this._listener = null;
         this._boundingBox = cc.rect();
-        this._tempMaterial = new SpriteMaterial;
+        this._material = new SpriteMaterial();
         this._materials = {};
         this._renderDatas = [];
         this._debugRenderer = null;
+    },
+
+    // override
+    _updateMaterial (material) {
+        this._super(material);
+        this._materials = {};
     },
 
     /**

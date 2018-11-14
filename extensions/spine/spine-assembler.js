@@ -47,7 +47,7 @@ function _updateKeyWithStencilRef (key, stencilRef) {
     return key.replace(/@\d+$/, STENCIL_SEP + stencilRef);
 }
 
-function _getSlotMaterial (materials, slot, tex, premultiAlpha) {
+function _getSlotMaterial (comp, slot, tex, premultiAlpha) {
     let src, dst;
     switch (slot.data.blendMode) {
         case spine.BlendMode.Additive:
@@ -70,9 +70,19 @@ function _getSlotMaterial (materials, slot, tex, premultiAlpha) {
     }
 
     let key = tex.url + src + dst + STENCIL_SEP + '0';
+    comp._material = comp._material || new SpriteMaterial();
+    let tplMaterial = comp._material;
+    let materials = comp._materials;
     let material = materials[key];
     if (!material) {
-        material = new SpriteMaterial();
+
+        var tplKey = tplMaterial._hash;
+        if (!materials[tplKey]) {
+            material = tplMaterial;
+        } else {
+            material = tplMaterial.clone();
+        }
+
         material.useModel = true;
         // update texture
         material.texture = tex;
@@ -195,7 +205,7 @@ var spineAssembler = {
             }
 
             newData = false;
-            material = _getSlotMaterial(materials, slot, attachment.region.texture._texture, premultiAlpha);
+            material = _getSlotMaterial(comp, slot, attachment.region.texture._texture, premultiAlpha);
             if (!material) {
                 continue;
             }

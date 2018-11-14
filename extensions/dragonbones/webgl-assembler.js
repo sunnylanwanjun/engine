@@ -39,7 +39,7 @@ function _updateKeyWithStencilRef (key, stencilRef) {
     return key.replace(/@\d+$/, STENCIL_SEP + stencilRef);
 }
 
-function _getSlotMaterial (materials, slot, premultiAlpha) {
+function _getSlotMaterial (comp, slot, premultiAlpha) {
     premultiAlpha = premultiAlpha || false;
     let tex = slot.getTexture();
     if(!tex)return null;
@@ -66,9 +66,19 @@ function _getSlotMaterial (materials, slot, premultiAlpha) {
     }
 
     let key = tex.url + src + dst + STENCIL_SEP + '0';
+    comp._material = comp._material || new SpriteMaterial();
+    let tplMaterial = comp._material;
+    let materials = comp._materials;
     let material = materials[key];
     if (!material) {
-        material = new SpriteMaterial();
+
+        var tplKey = tplMaterial._hash;
+        if (!materials[tplKey]) {
+            material = tplMaterial;
+        } else {
+            material = tplMaterial.clone();
+        }
+
         material.useModel = true;
         // update texture
         material.texture = tex;
@@ -98,6 +108,8 @@ let _vertexOffset, _indiceOffset,
     _dataId, _datas, _data, _newData;
 
 let armatureAssembler = {
+    useModel: true,
+
     updateRenderData (comp) {
 
         let armature = comp._armature;
@@ -142,11 +154,11 @@ let armatureAssembler = {
             // transform info,so multiply the slot's transform 
             // with parent transform and give the sub slots.
             if (slot.childArmature) {
-                this.traverseArmature(comp,slot.childArmature);
+                this.traverseArmature(comp, slot.childArmature);
                 continue;
             }
 
-            _material = _getSlotMaterial(comp._materials, slot);
+            _material = _getSlotMaterial(comp, slot);
             if (!_material) {
                 continue;
             }
@@ -259,7 +271,7 @@ let armatureAssembler = {
             
             let indiceOffset = buffer.indiceOffset,
                 vertexId = buffer.vertexOffset;
-                
+            
             buffer.request(vertexCount, data.indiceCount);
 
             // buffer data may be realloc, need get reference after request.

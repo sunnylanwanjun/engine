@@ -288,29 +288,25 @@ let ArmatureDisplay = cc.Class({
             },
             tooltip: CC_DEV && 'i18n:COMPONENT.dragon_bones.debug_bones'
         },
-
-        // override _material property,return first material,
-        // adapt to ModelBatcher
-        _material: {
-            get () {
-                for (var key in this._materials) {
-                    return this._materials[key];
-                }
-                return this._tempMaterial;
-            },
-            // shield change _material property
-            set () {
-                // do nothing
-            }
-        }
     },
 
     ctor () {
         this._renderDatas = [];
-        this._tempMaterial = new SpriteMaterial;
+        this._material = new SpriteMaterial;
+        // Property _materials Use to cache material,since dragonBones may use multiple texture,
+        // it will clone from the '_material' property,if the dragonbones only have one texture,
+        // it will just use the _material,won't clone it.
+        // So if invoke getMaterial,it only return _material,if you want to change all materials,
+        // you can change materials directly.
         this._materials = {};
         this._inited = false;
         this._factory = dragonBones.CCFactory.getInstance();
+    },
+
+    // override
+    _updateMaterial (material) {
+        this._super(material);
+        this._materials = {};
     },
 
     __preload () {

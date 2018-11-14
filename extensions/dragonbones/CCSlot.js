@@ -42,10 +42,14 @@ dragonBones.CCSlot = cc.Class({
         this._color = cc.color();
     },
 
-    reset () {
+    _onClear () {
+        this._super();
         this._localVertices.length = 0;
         this._indices.length = 0;
         math.mat4.identity(this._matrix);
+        math.mat4.identity(this._worldMatrix);
+        this._worldMatrixDirty = true;
+        this._color = cc.color();
         this._visible = false;
     },
 
@@ -55,9 +59,11 @@ dragonBones.CCSlot = cc.Class({
         }
     },
 
+    // just for adapt to dragonbones api,no need to do any thing
     _onUpdateDisplay () {
     },
 
+    // just for adapt to dragonbones api,no need to do any thing
     _initDisplay (value) {
     },
 
@@ -65,6 +71,7 @@ dragonBones.CCSlot = cc.Class({
         this._visible = true;
     },
 
+    // just for adapt to dragonbones api,no need to do any thing
     _replaceDisplay (value) {
     },
 
@@ -72,13 +79,16 @@ dragonBones.CCSlot = cc.Class({
         this._visible = false;
     },
 
+    // just for adapt to dragonbones api,no need to do any thing
     _disposeDisplay (object) {
     },
 
+    // just for adapt to dragonbones api,no need to do any thing
     _updateVisible () {
     },
 
-    _updateZOrder: function() {
+    // just for adapt to dragonbones api,no need to do any thing
+    _updateZOrder () {
     },
 
     _updateBlendMode () {
@@ -101,7 +111,7 @@ dragonBones.CCSlot = cc.Class({
     },
 
     //return dragonBones.CCTexture2D
-    getTexture(){
+    getTexture () {
         return this._textureData && this._textureData.spriteFrame && this._textureData.spriteFrame.getTexture();
     },
 
@@ -220,7 +230,7 @@ dragonBones.CCSlot = cc.Class({
         }
     },
 
-    _updateMesh : function() {
+    _updateMesh () {
         const scale = this._armature._armatureData.scale;
         const meshData = this._meshData;
         const hasDeform = this._deformVertices.length > 0 && meshData.inheritDeform;
