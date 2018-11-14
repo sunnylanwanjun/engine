@@ -56,7 +56,6 @@ dragonBones.CCSlot = cc.Class({
     },
 
     _onUpdateDisplay () {
-        
     },
 
     _initDisplay (value) {
@@ -67,7 +66,6 @@ dragonBones.CCSlot = cc.Class({
     },
 
     _replaceDisplay (value) {
-
     },
 
     _removeDisplay () {

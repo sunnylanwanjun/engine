@@ -314,6 +314,21 @@ sp.Skeleton = cc.Class({
             notify () {
                 this._initDebugDraw();
             }
+        },
+
+        // override _material property,return first material,
+        // adapt to ModelBatcher
+        _material: {
+            get () {
+                for (var key in this._materials) {
+                    return this._materials[key];
+                }
+                return this._tempMaterial;
+            },
+            // shield change _material property
+            set () {
+                // do nothing
+            }
         }
     },
 
@@ -323,9 +338,9 @@ sp.Skeleton = cc.Class({
         this._rootBone = null;
         this._listener = null;
         this._boundingBox = cc.rect();
-        this._material = new SpriteMaterial();
+        this._tempMaterial = new SpriteMaterial;
+        this._materials = {};
         this._renderDatas = [];
-        this._materialList = {};
         this._debugRenderer = null;
     },
 
@@ -397,9 +412,9 @@ sp.Skeleton = cc.Class({
 
     onRestore () {
         // Destroyed and restored in Editor
-        if (!this._material) {
+        if (!this._materials) {
             this._boundingBox = cc.rect();
-            this._material = new SpriteMaterial();
+            this._materials = {};
             this._renderDatas = [];
         }
     },

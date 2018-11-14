@@ -120,7 +120,6 @@ let ArmatureDisplay = cc.Class({
                 // parse the atlas asset data
                 this._parseDragonAtlasAsset();
                 this._buildArmature();
-                this._activateMaterial();
             },
             tooltip: CC_DEV && 'i18n:COMPONENT.dragon_bones.dragon_bones_atlas_asset'
         },
@@ -289,11 +288,27 @@ let ArmatureDisplay = cc.Class({
             },
             tooltip: CC_DEV && 'i18n:COMPONENT.dragon_bones.debug_bones'
         },
+
+        // override _material property,return first material,
+        // adapt to ModelBatcher
+        _material: {
+            get () {
+                for (var key in this._materials) {
+                    return this._materials[key];
+                }
+                return this._tempMaterial;
+            },
+            // shield change _material property
+            set () {
+                // do nothing
+            }
+        }
     },
 
     ctor () {
         this._renderDatas = [];
-        this._materialList = {};
+        this._tempMaterial = new SpriteMaterial;
+        this._materials = {};
         this._inited = false;
         this._factory = dragonBones.CCFactory.getInstance();
     },
@@ -309,7 +324,6 @@ let ArmatureDisplay = cc.Class({
         this._parseDragonAsset();
         this._parseDragonAtlasAsset();
         this._refresh();
-        this._activateMaterial();
     },
 
     onEnable () {
@@ -355,26 +369,6 @@ let ArmatureDisplay = cc.Class({
         }
     },
 
-    _activateMaterial () {
-        let texture = this.dragonAtlasAsset && this.dragonAtlasAsset.texture;
-        
-
-        // Get material
-        let material = this._material || new SpriteMaterial();
-        material.useColor = false;
-
-        if (texture) {
-            material.texture = texture;
-            this.markForUpdateRenderData(true);
-            this.markForRender(true);
-        }
-        else {
-            this.disableRender();
-        }
-
-        this._updateMaterial(material);
-    },
-
     _buildArmature () {
         if (!this.dragonAsset || !this.dragonAtlasAsset || !this.armatureName) return;
 
@@ -382,7 +376,7 @@ let ArmatureDisplay = cc.Class({
         if (!_displayProxy) return;
 
         this._displayProxy = _displayProxy;
-        this._displayProxy._logicNode_ = this.node;
+        this._displayProxy._ccNode = this.node;
 
         this._armature = this._displayProxy._armature;
         this._armature.animation.timeScale = this.timeScale;
