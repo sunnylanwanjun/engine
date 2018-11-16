@@ -52,7 +52,7 @@ var vfmtPosColor = new gfx.VertexFormat([
 ]);
 vfmtPosColor.name = 'vfmtPosColor';
 
-module.exports = {
+module.exports = cc.vfmt = {
     vfmt3D,
     vfmtPosUvColor,
     vfmtPosUv,
