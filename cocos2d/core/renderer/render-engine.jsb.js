@@ -1594,7 +1594,7 @@ function computeHash(material) {
     var effect = material._effect;
     var hashData = '';
     if (effect) {
-        var i, j, techData, param, prop, propKey;
+        var i, j, techData, param, prop, propKey, propm;
 
         // effect._defines
         hashData += serializeDefines(effect._defines);
@@ -1617,6 +1617,7 @@ function computeHash(material) {
                 if (!prop) {
                     continue;
                 }
+                propm = prop.m;
                 switch(param.type) {
                     case renderer.PARAM_INT:
                     case renderer.PARAM_FLOAT:
@@ -1634,7 +1635,7 @@ function computeHash(material) {
                         hashData += prop.r + ',' + prop.g + ',' + prop.b + ',' + prop.a + ';';
                         break;
                     case renderer.PARAM_MAT2:
-                        hashData += prop.m00 + ',' + prop.m01 + ',' + prop.m02 + ',' + prop.m03 + ';';
+                        hashData += propm[0] + ',' + propm[1] + ',' + propm[2] + ',' + propm[3] + ';';
                         break;
                     case renderer.PARAM_TEXTURE_2D:
                     case renderer.PARAM_TEXTURE_CUBE:
@@ -2943,8 +2944,9 @@ vec2.random = function (out, scale) {
 vec2.transformMat2 = function (out, a, m) {
   var x = a.x,
       y = a.y;
-  out.x = m.m00 * x + m.m02 * y;
-  out.y = m.m01 * x + m.m03 * y;
+  var mm = m.m;
+  out.x = mm[0] * x + mm[2] * y;
+  out.y = mm[1] * x + mm[3] * y;
   return out;
 };
 
@@ -2959,8 +2961,9 @@ vec2.transformMat2 = function (out, a, m) {
 vec2.transformMat23 = function (out, a, m) {
   var x = a.x,
       y = a.y;
-  out.x = m.m00 * x + m.m02 * y + m.m04;
-  out.y = m.m01 * x + m.m03 * y + m.m05;
+  var mm = m.m;
+  out.x = mm[0] * x + mm[2] * y + mm[4];
+  out.y = mm[1] * x + mm[3] * y + mm[5];
   return out;
 };
 
@@ -2976,8 +2979,9 @@ vec2.transformMat23 = function (out, a, m) {
 vec2.transformMat3 = function (out, a, m) {
   var x = a.x,
       y = a.y;
-  out.x = m.m00 * x + m.m03 * y + m.m06;
-  out.y = m.m01 * x + m.m04 * y + m.m07;
+  var mm = m.m;
+  out.x = mm[0] * x + mm[3] * y + mm[6];
+  out.y = mm[1] * x + mm[4] * y + mm[7];
   return out;
 };
 
@@ -2994,8 +2998,9 @@ vec2.transformMat3 = function (out, a, m) {
 vec2.transformMat4 = function (out, a, m) {
   var x = a.x,
       y = a.y;
-  out.x = m.m00 * x + m.m04 * y + m.m12;
-  out.y = m.m01 * x + m.m05 * y + m.m13;
+  var mm = m.m;
+  out.x = mm[0] * x + mm[4] * y + mm[12];
+  out.y = mm[1] * x + mm[5] * y + mm[13];
   return out;
 };
 
@@ -3645,12 +3650,13 @@ vec3.random = function (out, scale) {
  * @returns {vec3} out
  */
 vec3.transformMat4 = function (out, a, m) {
+  var mm = m.m;
   var x = a.x, y = a.y, z = a.z,
-      w = m.m03 * x + m.m07 * y + m.m11 * z + m.m15;
+      w = mm[3] * x + mm[7] * y + mm[11] * z + mm[15];
   w = w || 1.0;
-  out.x = (m.m00 * x + m.m04 * y + m.m08 * z + m.m12) / w;
-  out.y = (m.m01 * x + m.m05 * y + m.m09 * z + m.m13) / w;
-  out.z = (m.m02 * x + m.m06 * y + m.m10 * z + m.m14) / w;
+  out.x = (mm[0] * x + mm[4] * y + mm[8] * z + mm[12]) / w;
+  out.y = (mm[1] * x + mm[5] * y + mm[9] * z + mm[13]) / w;
+  out.z = (mm[2] * x + mm[6] * y + mm[10] * z + mm[14]) / w;
   return out;
 };
 
@@ -3664,9 +3670,10 @@ vec3.transformMat4 = function (out, a, m) {
  */
 vec3.transformMat3 = function (out, a, m) {
   var x = a.x, y = a.y, z = a.z;
-  out.x = x * m.m00 + y * m.m03 + z * m.m06;
-  out.y = x * m.m01 + y * m.m04 + z * m.m07;
-  out.z = x * m.m02 + y * m.m05 + z * m.m08;
+  var mm = m.m;
+  out.x = x * mm[0] + y * mm[3] + z * mm[6];
+  out.y = x * mm[1] + y * mm[4] + z * mm[7];
+  out.z = x * mm[2] + y * mm[5] + z * mm[8];
   return out;
 };
 
@@ -4422,10 +4429,11 @@ vec4.random = function (out, scale) {
  */
 vec4.transformMat4 = function (out, a, m) {
   var x = a.x, y = a.y, z = a.z, w = a.w;
-  out.x = m.m00 * x + m.m04 * y + m.m08 * z + m.m12 * w;
-  out.y = m.m01 * x + m.m05 * y + m.m09 * z + m.m13 * w;
-  out.z = m.m02 * x + m.m06 * y + m.m10 * z + m.m14 * w;
-  out.w = m.m03 * x + m.m07 * y + m.m11 * z + m.m15 * w;
+  var mm = m.m;
+  out.x = mm[0] * x + mm[4] * y + mm[8] * z + mm[12] * w;
+  out.y = mm[1] * x + mm[5] * y + mm[9] * z + mm[13] * w;
+  out.z = mm[2] * x + mm[6] * y + mm[10] * z + mm[14] * w;
+  out.w = mm[3] * x + mm[7] * y + mm[11] * z + mm[15] * w;
   return out;
 };
 
@@ -4549,32 +4557,45 @@ vec4.equals = function (a, b) {
     Math.abs(a3 - b3) <= EPSILON * Math.max(1.0, Math.abs(a3), Math.abs(b3)));
 };
 
-var _tmp$3 = new Array(9);
-
 var _mat3 = function _mat3(m00, m01, m02, m03, m04, m05, m06, m07, m08) {
-  this.m00 = m00;
-  this.m01 = m01;
-  this.m02 = m02;
-  this.m03 = m03;
-  this.m04 = m04;
-  this.m05 = m05;
-  this.m06 = m06;
-  this.m07 = m07;
-  this.m08 = m08;
+    if (m00 !== undefined) {
+        if (m00 instanceof Float32Array) {
+            var deepCopy = m01;
+            if (deepCopy) {
+                this.m = Float32Array.from(m00);
+            } else {
+                this.m = m00;
+            }
+        } else {
+            var m = this.m = new Float32Array(9);
+            m[0] = m00;
+            m[1] = m01;
+            m[2] = m02;
+            m[3] = m03;
+            m[4] = m04;
+            m[5] = m05;
+            m[6] = m06;
+            m[7] = m07;
+            m[8] = m08;
+        }
+    } else {
+        var m = this.m = new Float32Array(9);
+        m[0] = 1;
+        m[1] = 0;
+        m[2] = 0;
+
+        m[3] = 0;
+        m[4] = 1;
+        m[5] = 0;
+
+        m[6] = 0;
+        m[7] = 0;
+        m[8] = 1;
+    }
 };
 
-_mat3.prototype.toJSON = function toJSON () {
-  _tmp$3[0] = this.m00;
-  _tmp$3[1] = this.m01;
-  _tmp$3[2] = this.m02;
-  _tmp$3[3] = this.m03;
-  _tmp$3[4] = this.m04;
-  _tmp$3[5] = this.m05;
-  _tmp$3[6] = this.m06;
-  _tmp$3[7] = this.m07;
-  _tmp$3[8] = this.m08;
-
-  return _tmp$3;
+_mat3.prototype.toJSON = function toJSON() {
+    return this.m;
 };
 
 /**
@@ -4612,11 +4633,7 @@ var mat3 = {};
  * @returns {mat3} a new 3x3 matrix
  */
 mat3.create = function () {
-  return new _mat3(
-    1, 0, 0,
-    0, 1, 0,
-    0, 0, 1
-  );
+    return new _mat3();
 };
 
 /**
@@ -4634,11 +4651,11 @@ mat3.create = function () {
  * @returns {mat3} A new mat3
  */
 mat3.new = function (m00, m01, m02, m10, m11, m12, m20, m21, m22) {
-  return new _mat3(
-    m00, m01, m02,
-    m10, m11, m12,
-    m20, m21, m22
-  );
+    return new _mat3(
+        m00, m01, m02,
+        m10, m11, m12,
+        m20, m21, m22
+    );
 };
 
 /**
@@ -4648,11 +4665,7 @@ mat3.new = function (m00, m01, m02, m10, m11, m12, m20, m21, m22) {
  * @returns {mat3} a new 3x3 matrix
  */
 mat3.clone = function (a) {
-  return new _mat3(
-    a.m00, a.m01, a.m02,
-    a.m03, a.m04, a.m05,
-    a.m06, a.m07, a.m08
-  );
+    return new _mat3(a.m, true);
 };
 
 /**
@@ -4663,16 +4676,19 @@ mat3.clone = function (a) {
  * @returns {mat3} out
  */
 mat3.copy = function (out, a) {
-  out.m00 = a.m00;
-  out.m01 = a.m01;
-  out.m02 = a.m02;
-  out.m03 = a.m03;
-  out.m04 = a.m04;
-  out.m05 = a.m05;
-  out.m06 = a.m06;
-  out.m07 = a.m07;
-  out.m08 = a.m08;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+
+    outm[0] = am[0];
+    outm[1] = am[1];
+    outm[2] = am[2];
+    outm[3] = am[3];
+    outm[4] = am[4];
+    outm[5] = am[5];
+    outm[6] = am[6];
+    outm[7] = am[7];
+    outm[8] = am[8];
+    return out;
 };
 
 /**
@@ -4691,16 +4707,18 @@ mat3.copy = function (out, a) {
  * @returns {mat3} out
  */
 mat3.set = function (out, m00, m01, m02, m10, m11, m12, m20, m21, m22) {
-  out.m00 = m00;
-  out.m01 = m01;
-  out.m02 = m02;
-  out.m03 = m10;
-  out.m04 = m11;
-  out.m05 = m12;
-  out.m06 = m20;
-  out.m07 = m21;
-  out.m08 = m22;
-  return out;
+    var outm = out.m;
+
+    outm[0] = m00;
+    outm[1] = m01;
+    outm[2] = m02;
+    outm[3] = m10;
+    outm[4] = m11;
+    outm[5] = m12;
+    outm[6] = m20;
+    outm[7] = m21;
+    outm[8] = m22;
+    return out;
 };
 
 /**
@@ -4710,16 +4728,18 @@ mat3.set = function (out, m00, m01, m02, m10, m11, m12, m20, m21, m22) {
  * @returns {mat3} out
  */
 mat3.identity = function (out) {
-  out.m00 = 1;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 0;
-  out.m04 = 1;
-  out.m05 = 0;
-  out.m06 = 0;
-  out.m07 = 0;
-  out.m08 = 1;
-  return out;
+    var outm = out.m;
+
+    outm[0] = 1;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 0;
+    outm[4] = 1;
+    outm[5] = 0;
+    outm[6] = 0;
+    outm[7] = 0;
+    outm[8] = 1;
+    return out;
 };
 
 /**
@@ -4730,28 +4750,33 @@ mat3.identity = function (out) {
  * @returns {mat3} out
  */
 mat3.transpose = function (out, a) {
-  // If we are transposing ourselves we can skip a few steps but have to cache some values
-  if (out === a) {
-    var a01 = a.m01, a02 = a.m02, a12 = a.m05;
-    out.m01 = a.m03;
-    out.m02 = a.m06;
-    out.m03 = a01;
-    out.m05 = a.m07;
-    out.m06 = a02;
-    out.m07 = a12;
-  } else {
-    out.m00 = a.m00;
-    out.m01 = a.m03;
-    out.m02 = a.m06;
-    out.m03 = a.m01;
-    out.m04 = a.m04;
-    out.m05 = a.m07;
-    out.m06 = a.m02;
-    out.m07 = a.m05;
-    out.m08 = a.m08;
-  }
+    // If we are transposing ourselves we can skip a few steps but have to cache some values
+    var outm = out.m;
+    var am = a.m;
 
-  return out;
+    if (out === a) {
+        var a01 = am[1],
+            a02 = am[2],
+            a12 = am[5];
+        outm[1] = am[3];
+        outm[2] = am[6];
+        outm[3] = a01;
+        outm[5] = am[7];
+        outm[6] = a02;
+        outm[7] = a12;
+    } else {
+        outm[0] = am[0];
+        outm[1] = am[3];
+        outm[2] = am[6];
+        outm[3] = am[1];
+        outm[4] = am[4];
+        outm[5] = am[7];
+        outm[6] = am[2];
+        outm[7] = am[5];
+        outm[8] = am[8];
+    }
+
+    return out;
 };
 
 /**
@@ -4762,32 +4787,41 @@ mat3.transpose = function (out, a) {
  * @returns {mat3} out
  */
 mat3.invert = function (out, a) {
-  var a00 = a.m00, a01 = a.m01, a02 = a.m02,
-      a10 = a.m03, a11 = a.m04, a12 = a.m05,
-      a20 = a.m06, a21 = a.m07, a22 = a.m08;
+    var outm = out.m;
+    var am = a.m;
 
-  var b01 = a22 * a11 - a12 * a21;
-  var b11 = -a22 * a10 + a12 * a20;
-  var b21 = a21 * a10 - a11 * a20;
+    var a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a10 = am[3],
+        a11 = am[4],
+        a12 = am[5],
+        a20 = am[6],
+        a21 = am[7],
+        a22 = am[8];
 
-  // Calculate the determinant
-  var det = a00 * b01 + a01 * b11 + a02 * b21;
+    var b01 = a22 * a11 - a12 * a21;
+    var b11 = -a22 * a10 + a12 * a20;
+    var b21 = a21 * a10 - a11 * a20;
 
-  if (!det) {
-    return null;
-  }
-  det = 1.0 / det;
+    // Calculate the determinant
+    var det = a00 * b01 + a01 * b11 + a02 * b21;
 
-  out.m00 = b01 * det;
-  out.m01 = (-a22 * a01 + a02 * a21) * det;
-  out.m02 = (a12 * a01 - a02 * a11) * det;
-  out.m03 = b11 * det;
-  out.m04 = (a22 * a00 - a02 * a20) * det;
-  out.m05 = (-a12 * a00 + a02 * a10) * det;
-  out.m06 = b21 * det;
-  out.m07 = (-a21 * a00 + a01 * a20) * det;
-  out.m08 = (a11 * a00 - a01 * a10) * det;
-  return out;
+    if (!det) {
+        return null;
+    }
+    det = 1.0 / det;
+
+    outm[0] = b01 * det;
+    outm[1] = (-a22 * a01 + a02 * a21) * det;
+    outm[2] = (a12 * a01 - a02 * a11) * det;
+    outm[3] = b11 * det;
+    outm[4] = (a22 * a00 - a02 * a20) * det;
+    outm[5] = (-a12 * a00 + a02 * a10) * det;
+    outm[6] = b21 * det;
+    outm[7] = (-a21 * a00 + a01 * a20) * det;
+    outm[8] = (a11 * a00 - a01 * a10) * det;
+    return out;
 };
 
 /**
@@ -4798,20 +4832,29 @@ mat3.invert = function (out, a) {
  * @returns {mat3} out
  */
 mat3.adjoint = function (out, a) {
-  var a00 = a.m00, a01 = a.m01, a02 = a.m02,
-      a10 = a.m03, a11 = a.m04, a12 = a.m05,
-      a20 = a.m06, a21 = a.m07, a22 = a.m08;
+    var outm = out.m;
+    var am = a.m;
 
-  out.m00 = (a11 * a22 - a12 * a21);
-  out.m01 = (a02 * a21 - a01 * a22);
-  out.m02 = (a01 * a12 - a02 * a11);
-  out.m03 = (a12 * a20 - a10 * a22);
-  out.m04 = (a00 * a22 - a02 * a20);
-  out.m05 = (a02 * a10 - a00 * a12);
-  out.m06 = (a10 * a21 - a11 * a20);
-  out.m07 = (a01 * a20 - a00 * a21);
-  out.m08 = (a00 * a11 - a01 * a10);
-  return out;
+    var a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a10 = am[3],
+        a11 = am[4],
+        a12 = am[5],
+        a20 = am[6],
+        a21 = am[7],
+        a22 = am[8];
+
+    outm[0] = (a11 * a22 - a12 * a21);
+    outm[1] = (a02 * a21 - a01 * a22);
+    outm[2] = (a01 * a12 - a02 * a11);
+    outm[3] = (a12 * a20 - a10 * a22);
+    outm[4] = (a00 * a22 - a02 * a20);
+    outm[5] = (a02 * a10 - a00 * a12);
+    outm[6] = (a10 * a21 - a11 * a20);
+    outm[7] = (a01 * a20 - a00 * a21);
+    outm[8] = (a00 * a11 - a01 * a10);
+    return out;
 };
 
 /**
@@ -4821,11 +4864,18 @@ mat3.adjoint = function (out, a) {
  * @returns {Number} determinant of a
  */
 mat3.determinant = function (a) {
-  var a00 = a.m00, a01 = a.m01, a02 = a.m02,
-      a10 = a.m03, a11 = a.m04, a12 = a.m05,
-      a20 = a.m06, a21 = a.m07, a22 = a.m08;
+    var am = a.m;
+    var a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a10 = am[3],
+        a11 = am[4],
+        a12 = am[5],
+        a20 = am[6],
+        a21 = am[7],
+        a22 = am[8];
 
-  return a00 * (a22 * a11 - a12 * a21) + a01 * (-a22 * a10 + a12 * a20) + a02 * (a21 * a10 - a11 * a20);
+    return a00 * (a22 * a11 - a12 * a21) + a01 * (-a22 * a10 + a12 * a20) + a02 * (a21 * a10 - a11 * a20);
 };
 
 /**
@@ -4837,26 +4887,40 @@ mat3.determinant = function (a) {
  * @returns {mat3} out
  */
 mat3.multiply = function (out, a, b) {
-  var a00 = a.m00, a01 = a.m01, a02 = a.m02,
-      a10 = a.m03, a11 = a.m04, a12 = a.m05,
-      a20 = a.m06, a21 = a.m07, a22 = a.m08;
+    var outm = out.m;
+    var am = a.m;
+    var bm = b.m;
 
-  var b00 = b.m00, b01 = b.m01, b02 = b.m02;
-  var b10 = b.m03, b11 = b.m04, b12 = b.m05;
-  var b20 = b.m06, b21 = b.m07, b22 = b.m08;
+    var a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a10 = am[3],
+        a11 = am[4],
+        a12 = am[5],
+        a20 = am[6],
+        a21 = am[7],
+        a22 = am[8];
 
-  out.m00 = b00 * a00 + b01 * a10 + b02 * a20;
-  out.m01 = b00 * a01 + b01 * a11 + b02 * a21;
-  out.m02 = b00 * a02 + b01 * a12 + b02 * a22;
+    var b00 = bm[0],
+        b01 = bm[1],
+        b02 = bm[2];
+    var b10 = bm[3],
+        b11 = bm[4],
+        b12 = bm[5];
+    var b20 = bm[6],
+        b21 = bm[7],
+        b22 = bm[8];
 
-  out.m03 = b10 * a00 + b11 * a10 + b12 * a20;
-  out.m04 = b10 * a01 + b11 * a11 + b12 * a21;
-  out.m05 = b10 * a02 + b11 * a12 + b12 * a22;
-
-  out.m06 = b20 * a00 + b21 * a10 + b22 * a20;
-  out.m07 = b20 * a01 + b21 * a11 + b22 * a21;
-  out.m08 = b20 * a02 + b21 * a12 + b22 * a22;
-  return out;
+    outm[0] = b00 * a00 + b01 * a10 + b02 * a20;
+    outm[1] = b00 * a01 + b01 * a11 + b02 * a21;
+    outm[2] = b00 * a02 + b01 * a12 + b02 * a22;
+    outm[3] = b10 * a00 + b11 * a10 + b12 * a20;
+    outm[4] = b10 * a01 + b11 * a11 + b12 * a21;
+    outm[5] = b10 * a02 + b11 * a12 + b12 * a22;
+    outm[6] = b20 * a00 + b21 * a10 + b22 * a20;
+    outm[7] = b20 * a01 + b21 * a11 + b22 * a21;
+    outm[8] = b20 * a02 + b21 * a12 + b22 * a22;
+    return out;
 };
 
 /**
@@ -4874,23 +4938,31 @@ mat3.mul = mat3.multiply;
  * @returns {mat3} out
  */
 mat3.translate = function (out, a, v) {
-  var a00 = a.m00, a01 = a.m01, a02 = a.m02,
-      a10 = a.m03, a11 = a.m04, a12 = a.m05,
-      a20 = a.m06, a21 = a.m07, a22 = a.m08;
-  var x = v.x, y = v.y;
+    var outm = out.m;
+    var am = a.m;
 
-  out.m00 = a00;
-  out.m01 = a01;
-  out.m02 = a02;
+    var a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a10 = am[3],
+        a11 = am[4],
+        a12 = am[5],
+        a20 = am[6],
+        a21 = am[7],
+        a22 = am[8];
+    var x = v.x,
+        y = v.y;
 
-  out.m03 = a10;
-  out.m04 = a11;
-  out.m05 = a12;
-
-  out.m06 = x * a00 + y * a10 + a20;
-  out.m07 = x * a01 + y * a11 + a21;
-  out.m08 = x * a02 + y * a12 + a22;
-  return out;
+    outm[0] = a00;
+    outm[1] = a01;
+    outm[2] = a02;
+    outm[3] = a10;
+    outm[4] = a11;
+    outm[5] = a12;
+    outm[6] = x * a00 + y * a10 + a20;
+    outm[7] = x * a01 + y * a11 + a21;
+    outm[8] = x * a02 + y * a12 + a22;
+    return out;
 };
 
 /**
@@ -4902,25 +4974,32 @@ mat3.translate = function (out, a, v) {
  * @returns {mat3} out
  */
 mat3.rotate = function (out, a, rad) {
-  var a00 = a.m00, a01 = a.m01, a02 = a.m02,
-      a10 = a.m03, a11 = a.m04, a12 = a.m05,
-      a20 = a.m06, a21 = a.m07, a22 = a.m08;
+    var am = a.m;
+    var outm = out.m;
 
-  var s = Math.sin(rad);
-  var c = Math.cos(rad);
+    var a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a10 = am[3],
+        a11 = am[4],
+        a12 = am[5],
+        a20 = am[6],
+        a21 = am[7],
+        a22 = am[8];
 
-  out.m00 = c * a00 + s * a10;
-  out.m01 = c * a01 + s * a11;
-  out.m02 = c * a02 + s * a12;
+    var s = Math.sin(rad);
+    var c = Math.cos(rad);
 
-  out.m03 = c * a10 - s * a00;
-  out.m04 = c * a11 - s * a01;
-  out.m05 = c * a12 - s * a02;
-
-  out.m06 = a20;
-  out.m07 = a21;
-  out.m08 = a22;
-  return out;
+    outm[0] = c * a00 + s * a10;
+    outm[1] = c * a01 + s * a11;
+    outm[2] = c * a02 + s * a12;
+    outm[3] = c * a10 - s * a00;
+    outm[4] = c * a11 - s * a01;
+    outm[5] = c * a12 - s * a02;
+    outm[6] = a20;
+    outm[7] = a21;
+    outm[8] = a22;
+    return out;
 };
 
 /**
@@ -4932,20 +5011,22 @@ mat3.rotate = function (out, a, rad) {
  * @returns {mat3} out
  **/
 mat3.scale = function (out, a, v) {
-  var x = v.x, y = v.y;
+    var x = v.x,
+        y = v.y;
+    
+    var outm = out.m;
+    var am = a.m;
 
-  out.m00 = x * a.m00;
-  out.m01 = x * a.m01;
-  out.m02 = x * a.m02;
-
-  out.m03 = y * a.m03;
-  out.m04 = y * a.m04;
-  out.m05 = y * a.m05;
-
-  out.m06 = a.m06;
-  out.m07 = a.m07;
-  out.m08 = a.m08;
-  return out;
+    outm[0] = x * am[0];
+    outm[1] = x * am[1];
+    outm[2] = x * am[2];
+    outm[3] = y * am[3];
+    outm[4] = y * am[4];
+    outm[5] = y * am[5];
+    outm[6] = am[6];
+    outm[7] = am[7];
+    outm[8] = am[8];
+    return out;
 };
 
 /**
@@ -4956,16 +5037,19 @@ mat3.scale = function (out, a, v) {
  * @returns {mat3} out
  */
 mat3.fromMat4 = function (out, a) {
-  out.m00 = a.m00;
-  out.m01 = a.m01;
-  out.m02 = a.m02;
-  out.m03 = a.m04;
-  out.m04 = a.m05;
-  out.m05 = a.m06;
-  out.m06 = a.m08;
-  out.m07 = a.m09;
-  out.m08 = a.m10;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+
+    outm[0] = am[0];
+    outm[1] = am[1];
+    outm[2] = am[2];
+    outm[3] = am[4];
+    outm[4] = am[5];
+    outm[5] = am[6];
+    outm[6] = am[8];
+    outm[7] = am[9];
+    outm[8] = am[10];
+    return out;
 };
 
 /**
@@ -4980,16 +5064,18 @@ mat3.fromMat4 = function (out, a) {
  * @returns {mat3} out
  */
 mat3.fromTranslation = function (out, v) {
-  out.m00 = 1;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 0;
-  out.m04 = 1;
-  out.m05 = 0;
-  out.m06 = v.x;
-  out.m07 = v.y;
-  out.m08 = 1;
-  return out;
+    var outm = out.m;
+
+    outm[0] = 1;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 0;
+    outm[4] = 1;
+    outm[5] = 0;
+    outm[6] = v.x;
+    outm[7] = v.y;
+    outm[8] = 1;
+    return out;
 };
 
 /**
@@ -5004,20 +5090,21 @@ mat3.fromTranslation = function (out, v) {
  * @returns {mat3} out
  */
 mat3.fromRotation = function (out, rad) {
-  var s = Math.sin(rad), c = Math.cos(rad);
+    var s = Math.sin(rad),
+        c = Math.cos(rad);
 
-  out.m00 = c;
-  out.m01 = s;
-  out.m02 = 0;
+    var outm = out.m;
 
-  out.m03 = -s;
-  out.m04 = c;
-  out.m05 = 0;
-
-  out.m06 = 0;
-  out.m07 = 0;
-  out.m08 = 1;
-  return out;
+    outm[0] = c;
+    outm[1] = s;
+    outm[2] = 0;
+    outm[3] = -s;
+    outm[4] = c;
+    outm[5] = 0;
+    outm[6] = 0;
+    outm[7] = 0;
+    outm[8] = 1;
+    return out;
 };
 
 /**
@@ -5032,18 +5119,18 @@ mat3.fromRotation = function (out, rad) {
  * @returns {mat3} out
  */
 mat3.fromScaling = function (out, v) {
-  out.m00 = v.x;
-  out.m01 = 0;
-  out.m02 = 0;
+    var outm = out.m;
 
-  out.m03 = 0;
-  out.m04 = v.y;
-  out.m05 = 0;
-
-  out.m06 = 0;
-  out.m07 = 0;
-  out.m08 = 1;
-  return out;
+    outm[0] = v.x;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 0;
+    outm[4] = v.y;
+    outm[5] = 0;
+    outm[6] = 0;
+    outm[7] = 0;
+    outm[8] = 1;
+    return out;
 };
 
 /**
@@ -5054,146 +5141,163 @@ mat3.fromScaling = function (out, v) {
  * @returns {mat3} out
  **/
 mat3.fromMat2d = function (out, a) {
-  out.m00 = a.m00;
-  out.m01 = a.m01;
-  out.m02 = 0;
+    var outm = out.m;
+    var am = a.m;
 
-  out.m03 = a.m02;
-  out.m04 = a.m03;
-  out.m05 = 0;
-
-  out.m06 = a.m04;
-  out.m07 = a.m05;
-  out.m08 = 1;
-  return out;
+    outm[0] = am[0];
+    outm[1] = am[1];
+    outm[2] = 0;
+    outm[3] = am[2];
+    outm[4] = am[3];
+    outm[5] = 0;
+    outm[6] = am[4];
+    outm[7] = am[5];
+    outm[8] = 1;
+    return out;
 };
 
 /**
-* Calculates a 3x3 matrix from the given quaternion
-*
-* @param {mat3} out mat3 receiving operation result
-* @param {quat} q Quaternion to create matrix from
-*
-* @returns {mat3} out
-*/
+ * Calculates a 3x3 matrix from the given quaternion
+ *
+ * @param {mat3} out mat3 receiving operation result
+ * @param {quat} q Quaternion to create matrix from
+ *
+ * @returns {mat3} out
+ */
 mat3.fromQuat = function (out, q) {
-  var x = q.x, y = q.y, z = q.z, w = q.w;
-  var x2 = x + x;
-  var y2 = y + y;
-  var z2 = z + z;
+    var x = q.x,
+        y = q.y,
+        z = q.z,
+        w = q.w;
+    var x2 = x + x;
+    var y2 = y + y;
+    var z2 = z + z;
 
-  var xx = x * x2;
-  var yx = y * x2;
-  var yy = y * y2;
-  var zx = z * x2;
-  var zy = z * y2;
-  var zz = z * z2;
-  var wx = w * x2;
-  var wy = w * y2;
-  var wz = w * z2;
+    var xx = x * x2;
+    var yx = y * x2;
+    var yy = y * y2;
+    var zx = z * x2;
+    var zy = z * y2;
+    var zz = z * z2;
+    var wx = w * x2;
+    var wy = w * y2;
+    var wz = w * z2;
 
-  out.m00 = 1 - yy - zz;
-  out.m03 = yx - wz;
-  out.m06 = zx + wy;
+    var outm = out.m;
 
-  out.m01 = yx + wz;
-  out.m04 = 1 - xx - zz;
-  out.m07 = zy - wx;
-
-  out.m02 = zx - wy;
-  out.m05 = zy + wx;
-  out.m08 = 1 - xx - yy;
-
-  return out;
-};
-
-/**
-* Calculates a 3x3 matrix from view direction and up direction
-*
-* @param {mat3} out mat3 receiving operation result
-* @param {vec3} view view direction (must be normalized)
-* @param {vec3} [up] up direction, default is (0,1,0) (must be normalized)
-*
-* @returns {mat3} out
-*/
-mat3.fromViewUp = (function () {
-  var default_up = vec3.new(0, 1, 0);
-  var x = vec3.create();
-  var y = vec3.create();
-
-  return function (out, view, up) {
-    if (vec3.sqrLen(view) < EPSILON * EPSILON) {
-      mat3.identity(out);
-      return out;
-    }
-
-    up = up || default_up;
-    vec3.cross(x, up, view);
-
-    if (vec3.sqrLen(x) < EPSILON * EPSILON) {
-      mat3.identity(out);
-      return out;
-    }
-
-    vec3.cross(y, view, x);
-    mat3.set(out,
-      x.x, x.y, x.z,
-      y.x, y.y, y.z,
-      view.x, view.y, view.z
-    );
+    outm[0] = 1 - yy - zz;
+    outm[3] = yx - wz;
+    outm[6] = zx + wy;
+    outm[1] = yx + wz;
+    outm[4] = 1 - xx - zz;
+    outm[7] = zy - wx;
+    outm[2] = zx - wy;
+    outm[5] = zy + wx;
+    outm[8] = 1 - xx - yy;
 
     return out;
-  };
+};
+
+/**
+ * Calculates a 3x3 matrix from view direction and up direction
+ *
+ * @param {mat3} out mat3 receiving operation result
+ * @param {vec3} view view direction (must be normalized)
+ * @param {vec3} [up] up direction, default is (0,1,0) (must be normalized)
+ *
+ * @returns {mat3} out
+ */
+mat3.fromViewUp = (function () {
+    var default_up = vec3.new(0, 1, 0);
+    var x = vec3.create();
+    var y = vec3.create();
+
+    return function (out, view, up) {
+        if (vec3.sqrLen(view) < EPSILON * EPSILON) {
+            mat3.identity(out);
+            return out;
+        }
+
+        up = up || default_up;
+        vec3.cross(x, up, view);
+
+        if (vec3.sqrLen(x) < EPSILON * EPSILON) {
+            mat3.identity(out);
+            return out;
+        }
+
+        vec3.cross(y, view, x);
+        mat3.set(out,
+            x.x, x.y, x.z,
+            y.x, y.y, y.z,
+            view.x, view.y, view.z
+        );
+
+        return out;
+    };
 })();
 
 /**
-* Calculates a 3x3 normal matrix (transpose inverse) from the 4x4 matrix
-*
-* @param {mat3} out mat3 receiving operation result
-* @param {mat4} a Mat4 to derive the normal matrix from
-*
-* @returns {mat3} out
-*/
+ * Calculates a 3x3 normal matrix (transpose inverse) from the 4x4 matrix
+ *
+ * @param {mat3} out mat3 receiving operation result
+ * @param {mat4} a Mat4 to derive the normal matrix from
+ *
+ * @returns {mat3} out
+ */
 mat3.normalFromMat4 = function (out, a) {
-  var a00 = a.m00, a01 = a.m01, a02 = a.m02, a03 = a.m03,
-      a10 = a.m04, a11 = a.m05, a12 = a.m06, a13 = a.m07,
-      a20 = a.m08, a21 = a.m09, a22 = a.m10, a23 = a.m11,
-      a30 = a.m12, a31 = a.m13, a32 = a.m14, a33 = a.m15;
+    var outm = out.m;
+    var am = a.m;
 
-  var b00 = a00 * a11 - a01 * a10;
-  var b01 = a00 * a12 - a02 * a10;
-  var b02 = a00 * a13 - a03 * a10;
-  var b03 = a01 * a12 - a02 * a11;
-  var b04 = a01 * a13 - a03 * a11;
-  var b05 = a02 * a13 - a03 * a12;
-  var b06 = a20 * a31 - a21 * a30;
-  var b07 = a20 * a32 - a22 * a30;
-  var b08 = a20 * a33 - a23 * a30;
-  var b09 = a21 * a32 - a22 * a31;
-  var b10 = a21 * a33 - a23 * a31;
-  var b11 = a22 * a33 - a23 * a32;
+    var a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a03 = am[3],
+        a10 = am[4],
+        a11 = am[5],
+        a12 = am[6],
+        a13 = am[7],
+        a20 = am[8],
+        a21 = am[9],
+        a22 = am[10],
+        a23 = am[11],
+        a30 = am[12],
+        a31 = am[13],
+        a32 = am[14],
+        a33 = am[15];
 
-  // Calculate the determinant
-  var det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+    var b00 = a00 * a11 - a01 * a10;
+    var b01 = a00 * a12 - a02 * a10;
+    var b02 = a00 * a13 - a03 * a10;
+    var b03 = a01 * a12 - a02 * a11;
+    var b04 = a01 * a13 - a03 * a11;
+    var b05 = a02 * a13 - a03 * a12;
+    var b06 = a20 * a31 - a21 * a30;
+    var b07 = a20 * a32 - a22 * a30;
+    var b08 = a20 * a33 - a23 * a30;
+    var b09 = a21 * a32 - a22 * a31;
+    var b10 = a21 * a33 - a23 * a31;
+    var b11 = a22 * a33 - a23 * a32;
 
-  if (!det) {
-    return null;
-  }
-  det = 1.0 / det;
+    // Calculate the determinant
+    var det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
 
-  out.m00 = (a11 * b11 - a12 * b10 + a13 * b09) * det;
-  out.m01 = (a12 * b08 - a10 * b11 - a13 * b07) * det;
-  out.m02 = (a10 * b10 - a11 * b08 + a13 * b06) * det;
+    if (!det) {
+        return null;
+    }
+    det = 1.0 / det;
 
-  out.m03 = (a02 * b10 - a01 * b11 - a03 * b09) * det;
-  out.m04 = (a00 * b11 - a02 * b08 + a03 * b07) * det;
-  out.m05 = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+    outm[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
+    outm[1] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
+    outm[2] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
+    outm[3] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
+    outm[4] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
+    outm[5] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+    outm[6] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
+    outm[7] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
+    outm[8] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
 
-  out.m06 = (a31 * b05 - a32 * b04 + a33 * b03) * det;
-  out.m07 = (a32 * b02 - a30 * b05 - a33 * b01) * det;
-  out.m08 = (a30 * b04 - a31 * b02 + a33 * b00) * det;
-
-  return out;
+    return out;
 };
 
 /**
@@ -5203,7 +5307,8 @@ mat3.normalFromMat4 = function (out, a) {
  * @returns {String} string representation of the matrix
  */
 mat3.str = function (a) {
-  return ("mat3(" + (a.m00) + ", " + (a.m01) + ", " + (a.m02) + ", " + (a.m03) + ", " + (a.m04) + ", " + (a.m05) + ", " + (a.m06) + ", " + (a.m07) + ", " + (a.m08) + ")");
+    var am = a.m;
+    return ("mat3(" + (am[0]) + ", " + (am[1]) + ", " + (am[2]) + ", " + (am[3]) + ", " + (am[4]) + ", " + (am[5]) + ", " + (am[6]) + ", " + (am[7]) + ", " + (am[8]) + ")");
 };
 
 /**
@@ -5214,17 +5319,8 @@ mat3.str = function (a) {
  * @returns {array}
  */
 mat3.array = function (out, m) {
-  out[0] = m.m00;
-  out[1] = m.m01;
-  out[2] = m.m02;
-  out[3] = m.m03;
-  out[4] = m.m04;
-  out[5] = m.m05;
-  out[6] = m.m06;
-  out[7] = m.m07;
-  out[8] = m.m08;
-
-  return out;
+    out.set(m.m);
+    return out;
 };
 
 /**
@@ -5234,7 +5330,8 @@ mat3.array = function (out, m) {
  * @returns {Number} Frobenius norm
  */
 mat3.frob = function (a) {
-  return (Math.sqrt(Math.pow(a.m00, 2) + Math.pow(a.m01, 2) + Math.pow(a.m02, 2) + Math.pow(a.m03, 2) + Math.pow(a.m04, 2) + Math.pow(a.m05, 2) + Math.pow(a.m06, 2) + Math.pow(a.m07, 2) + Math.pow(a.m08, 2)));
+    var am = a.m;
+    return (Math.sqrt(Math.pow(am[0], 2) + Math.pow(am[1], 2) + Math.pow(am[2], 2) + Math.pow(am[3], 2) + Math.pow(am[4], 2) + Math.pow(am[5], 2) + Math.pow(am[6], 2) + Math.pow(am[7], 2) + Math.pow(am[8], 2)));
 };
 
 /**
@@ -5246,16 +5343,19 @@ mat3.frob = function (a) {
  * @returns {mat3} out
  */
 mat3.add = function (out, a, b) {
-  out.m00 = a.m00 + b.m00;
-  out.m01 = a.m01 + b.m01;
-  out.m02 = a.m02 + b.m02;
-  out.m03 = a.m03 + b.m03;
-  out.m04 = a.m04 + b.m04;
-  out.m05 = a.m05 + b.m05;
-  out.m06 = a.m06 + b.m06;
-  out.m07 = a.m07 + b.m07;
-  out.m08 = a.m08 + b.m08;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    var bm = b.m;
+    outm[0] = am[0] + bm[0];
+    outm[1] = am[1] + bm[1];
+    outm[2] = am[2] + bm[2];
+    outm[3] = am[3] + bm[3];
+    outm[4] = am[4] + bm[4];
+    outm[5] = am[5] + bm[5];
+    outm[6] = am[6] + bm[6];
+    outm[7] = am[7] + bm[7];
+    outm[8] = am[8] + bm[8];
+    return out;
 };
 
 /**
@@ -5267,16 +5367,19 @@ mat3.add = function (out, a, b) {
  * @returns {mat3} out
  */
 mat3.subtract = function (out, a, b) {
-  out.m00 = a.m00 - b.m00;
-  out.m01 = a.m01 - b.m01;
-  out.m02 = a.m02 - b.m02;
-  out.m03 = a.m03 - b.m03;
-  out.m04 = a.m04 - b.m04;
-  out.m05 = a.m05 - b.m05;
-  out.m06 = a.m06 - b.m06;
-  out.m07 = a.m07 - b.m07;
-  out.m08 = a.m08 - b.m08;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    var bm = b.m;
+    outm[0] = am[0] - bm[0];
+    outm[1] = am[1] - bm[1];
+    outm[2] = am[2] - bm[2];
+    outm[3] = am[3] - bm[3];
+    outm[4] = am[4] - bm[4];
+    outm[5] = am[5] - bm[5];
+    outm[6] = am[6] - bm[6];
+    outm[7] = am[7] - bm[7];
+    outm[8] = am[8] - bm[8];
+    return out;
 };
 
 /**
@@ -5294,16 +5397,18 @@ mat3.sub = mat3.subtract;
  * @returns {mat3} out
  */
 mat3.multiplyScalar = function (out, a, b) {
-  out.m00 = a.m00 * b;
-  out.m01 = a.m01 * b;
-  out.m02 = a.m02 * b;
-  out.m03 = a.m03 * b;
-  out.m04 = a.m04 * b;
-  out.m05 = a.m05 * b;
-  out.m06 = a.m06 * b;
-  out.m07 = a.m07 * b;
-  out.m08 = a.m08 * b;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    outm[0] = am[0] * b;
+    outm[1] = am[1] * b;
+    outm[2] = am[2] * b;
+    outm[3] = am[3] * b;
+    outm[4] = am[4] * b;
+    outm[5] = am[5] * b;
+    outm[6] = am[6] * b;
+    outm[7] = am[7] * b;
+    outm[8] = am[8] * b;
+    return out;
 };
 
 /**
@@ -5316,16 +5421,19 @@ mat3.multiplyScalar = function (out, a, b) {
  * @returns {mat3} out
  */
 mat3.multiplyScalarAndAdd = function (out, a, b, scale) {
-  out.m00 = a.m00 + (b.m00 * scale);
-  out.m01 = a.m01 + (b.m01 * scale);
-  out.m02 = a.m02 + (b.m02 * scale);
-  out.m03 = a.m03 + (b.m03 * scale);
-  out.m04 = a.m04 + (b.m04 * scale);
-  out.m05 = a.m05 + (b.m05 * scale);
-  out.m06 = a.m06 + (b.m06 * scale);
-  out.m07 = a.m07 + (b.m07 * scale);
-  out.m08 = a.m08 + (b.m08 * scale);
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    var bm = b.m;
+    outm[0] = am[0] + (bm[0] * scale);
+    outm[1] = am[1] + (bm[1] * scale);
+    outm[2] = am[2] + (bm[2] * scale);
+    outm[3] = am[3] + (bm[3] * scale);
+    outm[4] = am[4] + (bm[4] * scale);
+    outm[5] = am[5] + (bm[5] * scale);
+    outm[6] = am[6] + (bm[6] * scale);
+    outm[7] = am[7] + (bm[7] * scale);
+    outm[8] = am[8] + (bm[8] * scale);
+    return out;
 };
 
 /**
@@ -5336,9 +5444,11 @@ mat3.multiplyScalarAndAdd = function (out, a, b, scale) {
  * @returns {Boolean} True if the matrices are equal, false otherwise.
  */
 mat3.exactEquals = function (a, b) {
-  return a.m00 === b.m00 && a.m01 === b.m01 && a.m02 === b.m02 &&
-    a.m03 === b.m03 && a.m04 === b.m04 && a.m05 === b.m05 &&
-    a.m06 === b.m06 && a.m07 === b.m07 && a.m08 === b.m08;
+    var am = a.m;
+    var bm = b.m;
+    return am[0] === bm[0] && am[1] === bm[1] && am[2] === bm[2] &&
+        am[3] === bm[3] && am[4] === bm[4] && am[5] === bm[5] &&
+        am[6] === bm[6] && am[7] === bm[7] && am[8] === bm[8];
 };
 
 /**
@@ -5349,19 +5459,37 @@ mat3.exactEquals = function (a, b) {
  * @returns {Boolean} True if the matrices are equal, false otherwise.
  */
 mat3.equals = function (a, b) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03, a4 = a.m04, a5 = a.m05, a6 = a.m06, a7 = a.m07, a8 = a.m08;
-  var b0 = b.m00, b1 = b.m01, b2 = b.m02, b3 = b.m03, b4 = b.m04, b5 = b.m05, b6 = b.m06, b7 = b.m07, b8 = b.m08;
-  return (
-    Math.abs(a0 - b0) <= EPSILON * Math.max(1.0, Math.abs(a0), Math.abs(b0)) &&
-    Math.abs(a1 - b1) <= EPSILON * Math.max(1.0, Math.abs(a1), Math.abs(b1)) &&
-    Math.abs(a2 - b2) <= EPSILON * Math.max(1.0, Math.abs(a2), Math.abs(b2)) &&
-    Math.abs(a3 - b3) <= EPSILON * Math.max(1.0, Math.abs(a3), Math.abs(b3)) &&
-    Math.abs(a4 - b4) <= EPSILON * Math.max(1.0, Math.abs(a4), Math.abs(b4)) &&
-    Math.abs(a5 - b5) <= EPSILON * Math.max(1.0, Math.abs(a5), Math.abs(b5)) &&
-    Math.abs(a6 - b6) <= EPSILON * Math.max(1.0, Math.abs(a6), Math.abs(b6)) &&
-    Math.abs(a7 - b7) <= EPSILON * Math.max(1.0, Math.abs(a7), Math.abs(b7)) &&
-    Math.abs(a8 - b8) <= EPSILON * Math.max(1.0, Math.abs(a8), Math.abs(b8))
-  );
+    var am = a.m;
+    var bm = b.m;
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3],
+        a4 = am[4],
+        a5 = am[5],
+        a6 = am[6],
+        a7 = am[7],
+        a8 = am[8];
+    var b0 = bm[0],
+        b1 = bm[1],
+        b2 = bm[2],
+        b3 = bm[3],
+        b4 = bm[4],
+        b5 = bm[5],
+        b6 = bm[6],
+        b7 = bm[7],
+        b8 = bm[8];
+    return (
+        Math.abs(a0 - b0) <= EPSILON * Math.max(1.0, Math.abs(a0), Math.abs(b0)) &&
+        Math.abs(a1 - b1) <= EPSILON * Math.max(1.0, Math.abs(a1), Math.abs(b1)) &&
+        Math.abs(a2 - b2) <= EPSILON * Math.max(1.0, Math.abs(a2), Math.abs(b2)) &&
+        Math.abs(a3 - b3) <= EPSILON * Math.max(1.0, Math.abs(a3), Math.abs(b3)) &&
+        Math.abs(a4 - b4) <= EPSILON * Math.max(1.0, Math.abs(a4), Math.abs(b4)) &&
+        Math.abs(a5 - b5) <= EPSILON * Math.max(1.0, Math.abs(a5), Math.abs(b5)) &&
+        Math.abs(a6 - b6) <= EPSILON * Math.max(1.0, Math.abs(a6), Math.abs(b6)) &&
+        Math.abs(a7 - b7) <= EPSILON * Math.max(1.0, Math.abs(a7), Math.abs(b7)) &&
+        Math.abs(a8 - b8) <= EPSILON * Math.max(1.0, Math.abs(a8), Math.abs(b8))
+    );
 };
 
 var _tmp$4 = new Array(4);
@@ -5944,47 +6072,48 @@ quat.fromAxisAngle = function (out, axis, rad) {
  * @function
  */
 quat.fromMat3 = function (out, m) {
-  // http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.htm
-
-  var m00 = m.m00, m01 = m.m03, m02 = m.m06,
-      m10 = m.m01, m11 = m.m04, m12 = m.m07,
-      m20 = m.m02, m21 = m.m05, m22 = m.m08;
-
+  //   http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.  htm
+  
+  var mm = m.m;
+  var m00 = mm[0], m01 = mm[3], m02 = mm[6],
+      m10 = mm[1], m11 = mm[4], m12 = mm[7],
+      m20 = mm[2], m21 = mm[5], m22 = mm[8];
+  
   var trace = m00 + m11 + m22;
-
+  
   if (trace > 0) {
-    var s = 0.5 / Math.sqrt(trace + 1.0);
-
-    out.w = 0.25 / s;
-    out.x = (m21 - m12) * s;
-    out.y = (m02 - m20) * s;
-    out.z = (m10 - m01) * s;
-
+      var s = 0.5 / Math.sqrt(trace + 1.0);
+  
+      out.w = 0.25 / s;
+      out.x = (m21 - m12) * s;
+      out.y = (m02 - m20) * s;
+      out.z = (m10 - m01) * s;
+  
   } else if ((m00 > m11) && (m00 > m22)) {
-    var s$1 = 2.0 * Math.sqrt(1.0 + m00 - m11 - m22);
-
-    out.w = (m21 - m12) / s$1;
-    out.x = 0.25 * s$1;
-    out.y = (m01 + m10) / s$1;
-    out.z = (m02 + m20) / s$1;
-
+      var s$1 = 2.0 * Math.sqrt(1.0 + m00 - m11 - m22);
+  
+      out.w = (m21 - m12) / s$1;
+      out.x = 0.25 * s$1;
+      out.y = (m01 + m10) / s$1;
+      out.z = (m02 + m20) / s$1;
+  
   } else if (m11 > m22) {
-    var s$2 = 2.0 * Math.sqrt(1.0 + m11 - m00 - m22);
-
-    out.w = (m02 - m20) / s$2;
-    out.x = (m01 + m10) / s$2;
-    out.y = 0.25 * s$2;
-    out.z = (m12 + m21) / s$2;
-
+      var s$2 = 2.0 * Math.sqrt(1.0 + m11 - m00 - m22);
+  
+      out.w = (m02 - m20) / s$2;
+      out.x = (m01 + m10) / s$2;
+      out.y = 0.25 * s$2;
+      out.z = (m12 + m21) / s$2;
+  
   } else {
-    var s$3 = 2.0 * Math.sqrt(1.0 + m22 - m00 - m11);
-
-    out.w = (m10 - m01) / s$3;
-    out.x = (m02 + m20) / s$3;
-    out.y = (m12 + m21) / s$3;
-    out.z = 0.25 * s$3;
+      var s$3 = 2.0 * Math.sqrt(1.0 + m22 - m00 - m11);
+  
+      out.w = (m10 - m01) / s$3;
+      out.x = (m02 + m20) / s$3;
+      out.y = (m12 + m21) / s$3;
+      out.z = 0.25 * s$3;
   }
-
+  
   return out;
 };
 
@@ -6100,22 +6229,33 @@ quat.exactEquals = vec4.exactEquals;
  */
 quat.equals = vec4.equals;
 
-var _tmp$5 = new Array(4);
-
 var _mat2 = function _mat2(m00, m01, m02, m03) {
-  this.m00 = m00;
-  this.m01 = m01;
-  this.m02 = m02;
-  this.m03 = m03;
+    if (m00 !== undefined) {
+        if (m00 instanceof Float32Array) {
+            var deepCopy = m01;
+            if (deepCopy) {
+                this.m = Float32Array.from(m00);
+            } else {
+                this.m = m00;
+            }
+        } else {
+            var m = this.m = new Float32Array(4);
+            m[0] = m00;
+            m[1] = m01;
+            m[2] = m02;
+            m[3] = m03;
+        }
+    } else {
+        var m = this.m = new Float32Array(4);
+        m[0] = 1;
+        m[1] = 0;
+        m[2] = 0;
+        m[3] = 1;
+    }
 };
 
-_mat2.prototype.toJSON = function toJSON () {
-  _tmp$5[0] = this.m00;
-  _tmp$5[1] = this.m01;
-  _tmp$5[2] = this.m02;
-  _tmp$5[3] = this.m03;
-
-  return _tmp$5;
+_mat2.prototype.toJSON = function toJSON() {
+    return this.m;
 };
 
 /**
@@ -6129,8 +6269,8 @@ var mat2 = {};
  *
  * @returns {mat2} a new 2x2 matrix
  */
-mat2.create = function() {
-  return new _mat2(1, 0, 0, 1);
+mat2.create = function () {
+    return new _mat2();
 };
 
 /**
@@ -6143,7 +6283,7 @@ mat2.create = function() {
  * @returns {mat2} out A new 2x2 matrix
  */
 mat2.new = function (m00, m01, m10, m11) {
-  return new _mat2(m00, m01, m10, m11);
+    return new _mat2(m00, m01, m10, m11);
 };
 
 /**
@@ -6153,7 +6293,7 @@ mat2.new = function (m00, m01, m10, m11) {
  * @returns {mat2} a new 2x2 matrix
  */
 mat2.clone = function (a) {
-  return new _mat2(a.m00, a.m01, a.m02, a.m03);
+    return new _mat2(a.m, true);
 };
 
 /**
@@ -6164,11 +6304,13 @@ mat2.clone = function (a) {
  * @returns {mat2} out
  */
 mat2.copy = function (out, a) {
-  out.m00 = a.m00;
-  out.m01 = a.m01;
-  out.m02 = a.m02;
-  out.m03 = a.m03;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    outm[0] = am[0];
+    outm[1] = am[1];
+    outm[2] = am[2];
+    outm[3] = am[3];
+    return out;
 };
 
 /**
@@ -6178,11 +6320,12 @@ mat2.copy = function (out, a) {
  * @returns {mat2} out
  */
 mat2.identity = function (out) {
-  out.m00 = 1;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 1;
-  return out;
+    var outm = out.m;
+    outm[0] = 1;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 1;
+    return out;
 };
 
 /**
@@ -6196,11 +6339,12 @@ mat2.identity = function (out) {
  * @returns {mat2} out
  */
 mat2.set = function (out, m00, m01, m10, m11) {
-  out.m00 = m00;
-  out.m01 = m01;
-  out.m02 = m10;
-  out.m03 = m11;
-  return out;
+    var outm = out.m;
+    outm[0] = m00;
+    outm[1] = m01;
+    outm[2] = m10;
+    outm[3] = m11;
+    return out;
 };
 
 
@@ -6212,19 +6356,21 @@ mat2.set = function (out, m00, m01, m10, m11) {
  * @returns {mat2} out
  */
 mat2.transpose = function (out, a) {
-  // If we are transposing ourselves we can skip a few steps but have to cache some values
-  if (out === a) {
-    var a1 = a.m01;
-    out.m01 = a.m02;
-    out.m02 = a1;
-  } else {
-    out.m00 = a.m00;
-    out.m01 = a.m02;
-    out.m02 = a.m01;
-    out.m03 = a.m03;
-  }
+    // If we are transposing ourselves we can skip a few steps but have to cache some values
+    var outm = out.m;
+    var am = a.m;
+    if (out === a) {
+        var a1 = am[1];
+        outm[1] = am[2];
+        outm[2] = a1;
+    } else {
+        outm[0] = am[0];
+        outm[1] = am[2];
+        outm[2] = am[1];
+        outm[3] = am[3];
+    }
 
-  return out;
+    return out;
 };
 
 /**
@@ -6235,22 +6381,28 @@ mat2.transpose = function (out, a) {
  * @returns {mat2} out
  */
 mat2.invert = function (out, a) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03;
+    var outm = out.m;
+    var am = a.m;
 
-  // Calculate the determinant
-  var det = a0 * a3 - a2 * a1;
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3];
 
-  if (!det) {
-    return null;
-  }
-  det = 1.0 / det;
+    // Calculate the determinant
+    var det = a0 * a3 - a2 * a1;
 
-  out.m00 = a3 * det;
-  out.m01 = -a1 * det;
-  out.m02 = -a2 * det;
-  out.m03 = a0 * det;
+    if (!det) {
+        return null;
+    }
+    det = 1.0 / det;
 
-  return out;
+    outm[0] = a3 * det;
+    outm[1] = -a1 * det;
+    outm[2] = -a2 * det;
+    outm[3] = a0 * det;
+
+    return out;
 };
 
 /**
@@ -6261,14 +6413,17 @@ mat2.invert = function (out, a) {
  * @returns {mat2} out
  */
 mat2.adjoint = function (out, a) {
-  // Caching this value is nessecary if out == a
-  var a0 = a.m00;
-  out.m00 = a.m03;
-  out.m01 = -a.m01;
-  out.m02 = -a.m02;
-  out.m03 = a0;
+    // Caching this value is nessecary if out == a
+    var am = a.m;
+    var outm = out.m;
 
-  return out;
+    var a0 = am[0];
+    outm[0] = am[3];
+    outm[1] = -am[1];
+    outm[2] = -am[2];
+    outm[3] = a0;
+
+    return out;
 };
 
 /**
@@ -6278,7 +6433,8 @@ mat2.adjoint = function (out, a) {
  * @returns {Number} determinant of a
  */
 mat2.determinant = function (a) {
-  return a.m00 * a.m03 - a.m02 * a.m01;
+    var am = a.m;
+    return am[0] * am[3] - am[2] * am[1];
 };
 
 /**
@@ -6290,13 +6446,23 @@ mat2.determinant = function (a) {
  * @returns {mat2} out
  */
 mat2.multiply = function (out, a, b) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03;
-  var b0 = b.m00, b1 = b.m01, b2 = b.m02, b3 = b.m03;
-  out.m00 = a0 * b0 + a2 * b1;
-  out.m01 = a1 * b0 + a3 * b1;
-  out.m02 = a0 * b2 + a2 * b3;
-  out.m03 = a1 * b2 + a3 * b3;
-  return out;
+    var am = a.m;
+    var outm = out.m;
+    var bm = b.m;
+
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3];
+    var b0 = bm[0],
+        b1 = bm[1],
+        b2 = bm[2],
+        b3 = bm[3];
+    outm[0] = a0 * b0 + a2 * b1;
+    outm[1] = a1 * b0 + a3 * b1;
+    outm[2] = a0 * b2 + a2 * b3;
+    outm[3] = a1 * b2 + a3 * b3;
+    return out;
 };
 
 /**
@@ -6314,14 +6480,20 @@ mat2.mul = mat2.multiply;
  * @returns {mat2} out
  */
 mat2.rotate = function (out, a, rad) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03,
-      s = Math.sin(rad),
-      c = Math.cos(rad);
-  out.m00 = a0 * c + a2 * s;
-  out.m01 = a1 * c + a3 * s;
-  out.m02 = a0 * -s + a2 * c;
-  out.m03 = a1 * -s + a3 * c;
-  return out;
+    var am = a.m;
+    var outm = out.m;
+
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3],
+        s = Math.sin(rad),
+        c = Math.cos(rad);
+    outm[0] = a0 * c + a2 * s;
+    outm[1] = a1 * c + a3 * s;
+    outm[2] = a0 * -s + a2 * c;
+    outm[3] = a1 * -s + a3 * c;
+    return out;
 };
 
 /**
@@ -6333,13 +6505,20 @@ mat2.rotate = function (out, a, rad) {
  * @returns {mat2} out
  **/
 mat2.scale = function (out, a, v) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03,
-      v0 = v.x, v1 = v.y;
-  out.m00 = a0 * v0;
-  out.m01 = a1 * v0;
-  out.m02 = a2 * v1;
-  out.m03 = a3 * v1;
-  return out;
+    var am = a.m;
+    var outm = out.m;
+
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3],
+        v0 = v.x,
+        v1 = v.y;
+    outm[0] = a0 * v0;
+    outm[1] = a1 * v0;
+    outm[2] = a2 * v1;
+    outm[3] = a3 * v1;
+    return out;
 };
 
 /**
@@ -6354,13 +6533,15 @@ mat2.scale = function (out, a, v) {
  * @returns {mat2} out
  */
 mat2.fromRotation = function (out, rad) {
-  var s = Math.sin(rad),
-      c = Math.cos(rad);
-  out.m00 = c;
-  out.m01 = s;
-  out.m02 = -s;
-  out.m03 = c;
-  return out;
+    var outm = out.m;
+
+    var s = Math.sin(rad),
+        c = Math.cos(rad);
+    outm[0] = c;
+    outm[1] = s;
+    outm[2] = -s;
+    outm[3] = c;
+    return out;
 };
 
 /**
@@ -6375,11 +6556,12 @@ mat2.fromRotation = function (out, rad) {
  * @returns {mat2} out
  */
 mat2.fromScaling = function (out, v) {
-  out.m00 = v.x;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = v.y;
-  return out;
+    var outm = out.m;
+    outm[0] = v.x;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = v.y;
+    return out;
 };
 
 /**
@@ -6389,7 +6571,8 @@ mat2.fromScaling = function (out, v) {
  * @returns {String} string representation of the matrix
  */
 mat2.str = function (a) {
-  return ("mat2(" + (a.m00) + ", " + (a.m01) + ", " + (a.m02) + ", " + (a.m03) + ")");
+    var am = a.m;
+    return ("mat2(" + (am[0]) + ", " + (am[1]) + ", " + (am[2]) + ", " + (am[3]) + ")");
 };
 
 /**
@@ -6400,12 +6583,8 @@ mat2.str = function (a) {
  * @returns {array}
  */
 mat2.array = function (out, m) {
-  out[0] = m.m00;
-  out[1] = m.m01;
-  out[2] = m.m02;
-  out[3] = m.m03;
-
-  return out;
+    out.set(m.m);
+    return out;
 };
 
 /**
@@ -6415,7 +6594,8 @@ mat2.array = function (out, m) {
  * @returns {Number} Frobenius norm
  */
 mat2.frob = function (a) {
-  return (Math.sqrt(Math.pow(a.m00, 2) + Math.pow(a.m01, 2) + Math.pow(a.m02, 2) + Math.pow(a.m03, 2)));
+    var am = a.m;
+    return (Math.sqrt(Math.pow(am[0], 2) + Math.pow(am[1], 2) + Math.pow(am[2], 2) + Math.pow(am[3], 2)));
 };
 
 /**
@@ -6427,10 +6607,14 @@ mat2.frob = function (a) {
  */
 
 mat2.LDU = function (L, D, U, a) {
-  L.m02 = a.m02 / a.m00;
-  U.m00 = a.m00;
-  U.m01 = a.m01;
-  U.m03 = a.m03 - L.m02 * U.m01;
+    var Lm = L.m;
+    var Um = U.m;
+    var am = a.m;
+
+    Lm[2] = am[2] / am[0];
+    Um[0] = am[0];
+    Um[1] = am[1];
+    Um[3] = am[3] - Lm[2] * Um[1];
 };
 
 /**
@@ -6442,11 +6626,15 @@ mat2.LDU = function (L, D, U, a) {
  * @returns {mat2} out
  */
 mat2.add = function (out, a, b) {
-  out.m00 = a.m00 + b.m00;
-  out.m01 = a.m01 + b.m01;
-  out.m02 = a.m02 + b.m02;
-  out.m03 = a.m03 + b.m03;
-  return out;
+    var am = a.m;
+    var bm = b.m;
+    var outm = out.m;
+
+    outm[0] = am[0] + bm[0];
+    outm[1] = am[1] + bm[1];
+    outm[2] = am[2] + bm[2];
+    outm[3] = am[3] + bm[3];
+    return out;
 };
 
 /**
@@ -6458,11 +6646,15 @@ mat2.add = function (out, a, b) {
  * @returns {mat2} out
  */
 mat2.subtract = function (out, a, b) {
-  out.m00 = a.m00 - b.m00;
-  out.m01 = a.m01 - b.m01;
-  out.m02 = a.m02 - b.m02;
-  out.m03 = a.m03 - b.m03;
-  return out;
+    var am = a.m;
+    var bm = b.m;
+    var outm = out.m;
+
+    outm[0] = am[0] - bm[0];
+    outm[1] = am[1] - bm[1];
+    outm[2] = am[2] - bm[2];
+    outm[3] = am[3] - bm[3];
+    return out;
 };
 
 /**
@@ -6479,7 +6671,9 @@ mat2.sub = mat2.subtract;
  * @returns {Boolean} True if the matrices are equal, false otherwise.
  */
 mat2.exactEquals = function (a, b) {
-  return a.m00 === b.m00 && a.m01 === b.m01 && a.m02 === b.m02 && a.m03 === b.m03;
+    var am = a.m;
+    var bm = b.m;
+    return am[0] === bm[0] && am[1] === bm[1] && am[2] === bm[2] && am[3] === bm[3];
 };
 
 /**
@@ -6490,14 +6684,23 @@ mat2.exactEquals = function (a, b) {
  * @returns {Boolean} True if the matrices are equal, false otherwise.
  */
 mat2.equals = function (a, b) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03;
-  var b0 = b.m00, b1 = b.m01, b2 = b.m02, b3 = b.m03;
-  return (
-    Math.abs(a0 - b0) <= EPSILON * Math.max(1.0, Math.abs(a0), Math.abs(b0)) &&
-    Math.abs(a1 - b1) <= EPSILON * Math.max(1.0, Math.abs(a1), Math.abs(b1)) &&
-    Math.abs(a2 - b2) <= EPSILON * Math.max(1.0, Math.abs(a2), Math.abs(b2)) &&
-    Math.abs(a3 - b3) <= EPSILON * Math.max(1.0, Math.abs(a3), Math.abs(b3))
-  );
+    var am = a.m;
+    var bm = b.m;
+
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3];
+    var b0 = bm[0],
+        b1 = bm[1],
+        b2 = bm[2],
+        b3 = bm[3];
+    return (
+        Math.abs(a0 - b0) <= EPSILON * Math.max(1.0, Math.abs(a0), Math.abs(b0)) &&
+        Math.abs(a1 - b1) <= EPSILON * Math.max(1.0, Math.abs(a1), Math.abs(b1)) &&
+        Math.abs(a2 - b2) <= EPSILON * Math.max(1.0, Math.abs(a2), Math.abs(b2)) &&
+        Math.abs(a3 - b3) <= EPSILON * Math.max(1.0, Math.abs(a3), Math.abs(b3))
+    );
 };
 
 /**
@@ -6509,11 +6712,14 @@ mat2.equals = function (a, b) {
  * @returns {mat2} out
  */
 mat2.multiplyScalar = function (out, a, b) {
-  out.m00 = a.m00 * b;
-  out.m01 = a.m01 * b;
-  out.m02 = a.m02 * b;
-  out.m03 = a.m03 * b;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+
+    outm[0] = am[0] * b;
+    outm[1] = am[1] * b;
+    outm[2] = am[2] * b;
+    outm[3] = am[3] * b;
+    return out;
 };
 
 /**
@@ -6526,33 +6732,49 @@ mat2.multiplyScalar = function (out, a, b) {
  * @returns {mat2} out
  */
 mat2.multiplyScalarAndAdd = function (out, a, b, scale) {
-  out.m00 = a.m00 + (b.m00 * scale);
-  out.m01 = a.m01 + (b.m01 * scale);
-  out.m02 = a.m02 + (b.m02 * scale);
-  out.m03 = a.m03 + (b.m03 * scale);
-  return out;
+    var outm = out.m;
+    var bm = b.m;
+    var am = a.m;
+
+    outm[0] = am[0] + (bm[0] * scale);
+    outm[1] = am[1] + (bm[1] * scale);
+    outm[2] = am[2] + (bm[2] * scale);
+    outm[3] = am[3] + (bm[3] * scale);
+    return out;
 };
 
-var _tmp$6 = new Array(6);
 
 var _mat23 = function _mat23(m00, m01, m02, m03, m04, m05) {
-  this.m00 = m00;
-  this.m01 = m01;
-  this.m02 = m02;
-  this.m03 = m03;
-  this.m04 = m04;
-  this.m05 = m05;
+    if (m00 !== undefined) {
+        if (m00 instanceof Float32Array) {
+            var deepCopy = m01;
+            if (deepCopy) {
+                this.m = Float32Array.from(m00);
+            } else {
+                this.m = m00;
+            }
+        } else {
+            var m = this.m = new Float32Array(6);
+            m[0] = m00;
+            m[1] = m01;
+            m[2] = m02;
+            m[3] = m03;
+            m[4] = m04;
+            m[5] = m05;
+        }
+    } else {
+        var m = this.m = new Float32Array(6);
+        m[0] = 1;
+        m[1] = 0;
+        m[2] = 0;
+        m[3] = 1;
+        m[4] = 0;
+        m[5] = 0;
+    }
 };
 
-_mat23.prototype.toJSON = function toJSON () {
-  _tmp$6[0] = this.m00;
-  _tmp$6[1] = this.m01;
-  _tmp$6[2] = this.m02;
-  _tmp$6[3] = this.m03;
-  _tmp$6[4] = this.m04;
-  _tmp$6[5] = this.m05;
-
-  return _tmp$6;
+_mat23.prototype.toJSON = function toJSON() {
+    return this.m;
 };
 
 /**
@@ -6581,11 +6803,7 @@ var mat23 = {};
  * @returns {mat23} a new 2x3 matrix
  */
 mat23.create = function () {
-  return new _mat23(
-    1, 0,
-    0, 1,
-    0, 0
-  );
+    return new _mat23();
 };
 
 /**
@@ -6600,11 +6818,11 @@ mat23.create = function () {
  * @returns {mat23} A new mat23
  */
 mat23.new = function (a, b, c, d, tx, ty) {
-  return new _mat23(
-    a, b,
-    c, d,
-    tx, ty
-  );
+    return new _mat23(
+        a, b,
+        c, d,
+        tx, ty
+    );
 };
 
 /**
@@ -6614,11 +6832,7 @@ mat23.new = function (a, b, c, d, tx, ty) {
  * @returns {mat23} a new 2x3 matrix
  */
 mat23.clone = function (a) {
-  return new _mat23(
-    a.m00, a.m01,
-    a.m02, a.m03,
-    a.m04, a.m05
-  );
+    return new _mat23(a.m, true);
 };
 
 /**
@@ -6629,13 +6843,16 @@ mat23.clone = function (a) {
  * @returns {mat23} out
  */
 mat23.copy = function (out, a) {
-  out.m00 = a.m00;
-  out.m01 = a.m01;
-  out.m02 = a.m02;
-  out.m03 = a.m03;
-  out.m04 = a.m04;
-  out.m05 = a.m05;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+
+    outm[0] = am[0];
+    outm[1] = am[1];
+    outm[2] = am[2];
+    outm[3] = am[3];
+    outm[4] = am[4];
+    outm[5] = am[5];
+    return out;
 };
 
 /**
@@ -6645,13 +6862,14 @@ mat23.copy = function (out, a) {
  * @returns {mat23} out
  */
 mat23.identity = function (out) {
-  out.m00 = 1;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 1;
-  out.m04 = 0;
-  out.m05 = 0;
-  return out;
+    var outm = out.m;
+    outm[0] = 1;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 1;
+    outm[4] = 0;
+    outm[5] = 0;
+    return out;
 };
 
 /**
@@ -6667,13 +6885,14 @@ mat23.identity = function (out) {
  * @returns {mat23} out
  */
 mat23.set = function (out, a, b, c, d, tx, ty) {
-  out.m00 = a;
-  out.m01 = b;
-  out.m02 = c;
-  out.m03 = d;
-  out.m04 = tx;
-  out.m05 = ty;
-  return out;
+    var outm = out.m;
+    outm[0] = a;
+    outm[1] = b;
+    outm[2] = c;
+    outm[3] = d;
+    outm[4] = tx;
+    outm[5] = ty;
+    return out;
 };
 
 /**
@@ -6684,22 +6903,29 @@ mat23.set = function (out, a, b, c, d, tx, ty) {
  * @returns {mat23} out
  */
 mat23.invert = function (out, a) {
-  var aa = a.m00, ab = a.m01, ac = a.m02, ad = a.m03,
-    atx = a.m04, aty = a.m05;
+    var outm = out.m;
+    var am = a.m;
 
-  var det = aa * ad - ab * ac;
-  if (!det) {
-    return null;
-  }
-  det = 1.0 / det;
+    var aa =  am[0],
+        ab =  am[1],
+        ac =  am[2],
+        ad =  am[3],
+        atx = am[4],
+        aty = am[5];
 
-  out.m00 = ad * det;
-  out.m01 = -ab * det;
-  out.m02 = -ac * det;
-  out.m03 = aa * det;
-  out.m04 = (ac * aty - ad * atx) * det;
-  out.m05 = (ab * atx - aa * aty) * det;
-  return out;
+    var det = aa * ad - ab * ac;
+    if (!det) {
+        return null;
+    }
+    det = 1.0 / det;
+
+    outm[0] = ad * det;
+    outm[1] = -ab * det;
+    outm[2] = -ac * det;
+    outm[3] = aa * det;
+    outm[4] = (ac * aty - ad * atx) * det;
+    outm[5] = (ab * atx - aa * aty) * det;
+    return out;
 };
 
 /**
@@ -6709,7 +6935,8 @@ mat23.invert = function (out, a) {
  * @returns {Number} determinant of a
  */
 mat23.determinant = function (a) {
-  return a.m00 * a.m03 - a.m01 * a.m02;
+    var am = a.m;
+    return am[0] * am[3] - am[1] * am[2];
 };
 
 /**
@@ -6721,15 +6948,29 @@ mat23.determinant = function (a) {
  * @returns {mat23} out
  */
 mat23.multiply = function (out, a, b) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03, a4 = a.m04, a5 = a.m05,
-    b0 = b.m00, b1 = b.m01, b2 = b.m02, b3 = b.m03, b4 = b.m04, b5 = b.m05;
-  out.m00 = a0 * b0 + a2 * b1;
-  out.m01 = a1 * b0 + a3 * b1;
-  out.m02 = a0 * b2 + a2 * b3;
-  out.m03 = a1 * b2 + a3 * b3;
-  out.m04 = a0 * b4 + a2 * b5 + a4;
-  out.m05 = a1 * b4 + a3 * b5 + a5;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    var bm = b.m;
+
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3],
+        a4 = am[4],
+        a5 = am[5],
+        b0 = bm[0],
+        b1 = bm[1],
+        b2 = bm[2],
+        b3 = bm[3],
+        b4 = bm[4],
+        b5 = bm[5];
+    outm[0] = a0 * b0 + a2 * b1;
+    outm[1] = a1 * b0 + a3 * b1;
+    outm[2] = a0 * b2 + a2 * b3;
+    outm[3] = a1 * b2 + a3 * b3;
+    outm[4] = a0 * b4 + a2 * b5 + a4;
+    outm[5] = a1 * b4 + a3 * b5 + a5;
+    return out;
 };
 
 /**
@@ -6747,16 +6988,23 @@ mat23.mul = mat23.multiply;
  * @returns {mat23} out
  */
 mat23.rotate = function (out, a, rad) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03, a4 = a.m04, a5 = a.m05,
-    s = Math.sin(rad),
-    c = Math.cos(rad);
-  out.m00 = a0 * c + a2 * s;
-  out.m01 = a1 * c + a3 * s;
-  out.m02 = a0 * -s + a2 * c;
-  out.m03 = a1 * -s + a3 * c;
-  out.m04 = a4;
-  out.m05 = a5;
-  return out;
+    var am = a.m;
+    var outm = out.m;
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3],
+        a4 = am[4],
+        a5 = am[5],
+        s = Math.sin(rad),
+        c = Math.cos(rad);
+    outm[0] = a0 * c + a2 * s;
+    outm[1] = a1 * c + a3 * s;
+    outm[2] = a0 * -s + a2 * c;
+    outm[3] = a1 * -s + a3 * c;
+    outm[4] = a4;
+    outm[5] = a5;
+    return out;
 };
 
 /**
@@ -6768,15 +7016,23 @@ mat23.rotate = function (out, a, rad) {
  * @returns {mat23} out
  **/
 mat23.scale = function (out, a, v) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03, a4 = a.m04, a5 = a.m05,
-    v0 = v.x, v1 = v.y;
-  out.m00 = a0 * v0;
-  out.m01 = a1 * v0;
-  out.m02 = a2 * v1;
-  out.m03 = a3 * v1;
-  out.m04 = a4;
-  out.m05 = a5;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3],
+        a4 = am[4],
+        a5 = am[5],
+        v0 = v.x,
+        v1 = v.y;
+    outm[0] = a0 * v0;
+    outm[1] = a1 * v0;
+    outm[2] = a2 * v1;
+    outm[3] = a3 * v1;
+    outm[4] = a4;
+    outm[5] = a5;
+    return out;
 };
 
 /**
@@ -6788,15 +7044,23 @@ mat23.scale = function (out, a, v) {
  * @returns {mat23} out
  **/
 mat23.translate = function (out, a, v) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03, a4 = a.m04, a5 = a.m05,
-    v0 = v.x, v1 = v.y;
-  out.m00 = a0;
-  out.m01 = a1;
-  out.m02 = a2;
-  out.m03 = a3;
-  out.m04 = a0 * v0 + a2 * v1 + a4;
-  out.m05 = a1 * v0 + a3 * v1 + a5;
-  return out;
+    var am = a.m;
+    var outm = out.m;
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3],
+        a4 = am[4],
+        a5 = am[5],
+        v0 = v.x,
+        v1 = v.y;
+    outm[0] = a0;
+    outm[1] = a1;
+    outm[2] = a2;
+    outm[3] = a3;
+    outm[4] = a0 * v0 + a2 * v1 + a4;
+    outm[5] = a1 * v0 + a3 * v1 + a5;
+    return out;
 };
 
 /**
@@ -6811,14 +7075,16 @@ mat23.translate = function (out, a, v) {
  * @returns {mat23} out
  */
 mat23.fromRotation = function (out, rad) {
-  var s = Math.sin(rad), c = Math.cos(rad);
-  out.m00 = c;
-  out.m01 = s;
-  out.m02 = -s;
-  out.m03 = c;
-  out.m04 = 0;
-  out.m05 = 0;
-  return out;
+    var s = Math.sin(rad),
+        c = Math.cos(rad);
+    var outm = out.m;
+    outm[0] = c;
+    outm[1] = s;
+    outm[2] = -s;
+    outm[3] = c;
+    outm[4] = 0;
+    outm[5] = 0;
+    return out;
 };
 
 /**
@@ -6833,13 +7099,14 @@ mat23.fromRotation = function (out, rad) {
  * @returns {mat23} out
  */
 mat23.fromScaling = function (out, v) {
-  out.m00 = v.m00;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = v.m01;
-  out.m04 = 0;
-  out.m05 = 0;
-  return out;
+    var outm = out.m;
+    outm[0] = v.x;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = v.y;
+    outm[4] = 0;
+    outm[5] = 0;
+    return out;
 };
 
 /**
@@ -6854,13 +7121,14 @@ mat23.fromScaling = function (out, v) {
  * @returns {mat23} out
  */
 mat23.fromTranslation = function (out, v) {
-  out.m00 = 1;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 1;
-  out.m04 = v.x;
-  out.m05 = v.y;
-  return out;
+    var outm = out.m;
+    outm[0] = 1;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 1;
+    outm[4] = v.x;
+    outm[5] = v.y;
+    return out;
 };
 
 /**
@@ -6870,7 +7138,8 @@ mat23.fromTranslation = function (out, v) {
  * @returns {String} string representation of the matrix
  */
 mat23.str = function (a) {
-  return ("mat23(" + (a.m00) + ", " + (a.m01) + ", " + (a.m02) + ", " + (a.m03) + ", " + (a.m04) + ", " + (a.m05) + ")");
+    var am = a.m;
+    return ("mat23(" + (am[0]) + ", " + (am[1]) + ", " + (am[2]) + ", " + (am[3]) + ", " + (am[4]) + ", " + (am[5]) + ")");
 };
 
 /**
@@ -6881,14 +7150,8 @@ mat23.str = function (a) {
  * @returns {array}
  */
 mat23.array = function (out, m) {
-  out[0] = m.m00;
-  out[1] = m.m01;
-  out[2] = m.m02;
-  out[3] = m.m03;
-  out[4] = m.m04;
-  out[5] = m.m05;
-
-  return out;
+    out.m.set(m.m);
+    return out;
 };
 
 /**
@@ -6899,24 +7162,25 @@ mat23.array = function (out, m) {
  * @returns {array}
  */
 mat23.array4x4 = function (out, m) {
-  out[0] = m.m00;
-  out[1] = m.m01;
-  out[2] = 0;
-  out[3] = 0;
-  out[4] = m.m02;
-  out[5] = m.m03;
-  out[6] = 0;
-  out[7] = 0;
-  out[8] = 0;
-  out[9] = 0;
-  out[10] = 1;
-  out[11] = 0;
-  out[12] = m.m04;
-  out[13] = m.m05;
-  out[14] = 0;
-  out[15] = 1;
+    var mm = m.m;
+    out[0] = mm[0];
+    out[1] = mm[1];
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = mm[2];
+    out[5] = mm[3];
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = 0;
+    out[9] = 0;
+    out[10] = 1;
+    out[11] = 0;
+    out[12] = mm[4];
+    out[13] = mm[5];
+    out[14] = 0;
+    out[15] = 1;
 
-  return out;
+    return out;
 };
 
 /**
@@ -6926,7 +7190,8 @@ mat23.array4x4 = function (out, m) {
  * @returns {Number} Frobenius norm
  */
 mat23.frob = function (a) {
-  return (Math.sqrt(Math.pow(a.m00, 2) + Math.pow(a.m01, 2) + Math.pow(a.m02, 2) + Math.pow(a.m03, 2) + Math.pow(a.m04, 2) + Math.pow(a.m05, 2) + 1));
+    var am = a.m;
+    return (Math.sqrt(Math.pow(am[0], 2) + Math.pow(am[1], 2) + Math.pow(am[2], 2) + Math.pow(am[3], 2) + Math.pow(am[4], 2) + Math.pow(am[5], 2) + 1));
 };
 
 /**
@@ -6938,13 +7203,16 @@ mat23.frob = function (a) {
  * @returns {mat23} out
  */
 mat23.add = function (out, a, b) {
-  out.m00 = a.m00 + b.m00;
-  out.m01 = a.m01 + b.m01;
-  out.m02 = a.m02 + b.m02;
-  out.m03 = a.m03 + b.m03;
-  out.m04 = a.m04 + b.m04;
-  out.m05 = a.m05 + b.m05;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    var bm = b.m;
+    outm[0] = am[0] + bm[0];
+    outm[1] = am[1] + bm[1];
+    outm[2] = am[2] + bm[2];
+    outm[3] = am[3] + bm[3];
+    outm[4] = am[4] + bm[4];
+    outm[5] = am[5] + bm[5];
+    return out;
 };
 
 /**
@@ -6956,13 +7224,16 @@ mat23.add = function (out, a, b) {
  * @returns {mat23} out
  */
 mat23.subtract = function (out, a, b) {
-  out.m00 = a.m00 - b.m00;
-  out.m01 = a.m01 - b.m01;
-  out.m02 = a.m02 - b.m02;
-  out.m03 = a.m03 - b.m03;
-  out.m04 = a.m04 - b.m04;
-  out.m05 = a.m05 - b.m05;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    var bm = b.m;
+    outm[0] = am[0] - bm[0];
+    outm[1] = am[1] - bm[1];
+    outm[2] = am[2] - bm[2];
+    outm[3] = am[3] - bm[3];
+    outm[4] = am[4] - bm[4];
+    outm[5] = am[5] - bm[5];
+    return out;
 };
 
 /**
@@ -6980,13 +7251,15 @@ mat23.sub = mat23.subtract;
  * @returns {mat23} out
  */
 mat23.multiplyScalar = function (out, a, b) {
-  out.m00 = a.m00 * b;
-  out.m01 = a.m01 * b;
-  out.m02 = a.m02 * b;
-  out.m03 = a.m03 * b;
-  out.m04 = a.m04 * b;
-  out.m05 = a.m05 * b;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    outm[0] = am[0] * b;
+    outm[1] = am[1] * b;
+    outm[2] = am[2] * b;
+    outm[3] = am[3] * b;
+    outm[4] = am[4] * b;
+    outm[5] = am[5] * b;
+    return out;
 };
 
 /**
@@ -6999,13 +7272,16 @@ mat23.multiplyScalar = function (out, a, b) {
  * @returns {mat23} out
  */
 mat23.multiplyScalarAndAdd = function (out, a, b, scale) {
-  out.m00 = a.m00 + (b.m00 * scale);
-  out.m01 = a.m01 + (b.m01 * scale);
-  out.m02 = a.m02 + (b.m02 * scale);
-  out.m03 = a.m03 + (b.m03 * scale);
-  out.m04 = a.m04 + (b.m04 * scale);
-  out.m05 = a.m05 + (b.m05 * scale);
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    var bm = b.m;
+    outm[0] = am[0] + (bm[0] * scale);
+    outm[1] = am[1] + (bm[1] * scale);
+    outm[2] = am[2] + (bm[2] * scale);
+    outm[3] = am[3] + (bm[3] * scale);
+    outm[4] = am[4] + (bm[4] * scale);
+    outm[5] = am[5] + (bm[5] * scale);
+    return out;
 };
 
 /**
@@ -7016,7 +7292,9 @@ mat23.multiplyScalarAndAdd = function (out, a, b, scale) {
  * @returns {Boolean} True if the matrices are equal, false otherwise.
  */
 mat23.exactEquals = function (a, b) {
-  return a.m00 === b.m00 && a.m01 === b.m01 && a.m02 === b.m02 && a.m03 === b.m03 && a.m04 === b.m04 && a.m05 === b.m05;
+    var am = a.m;
+    var bm = b.m;
+    return am[0] === bm[0] && am[1] === bm[1] && am[2] === bm[2] && am[3] === bm[3] && am[4] === bm[4] && am[5] === bm[5];
 };
 
 /**
@@ -7027,63 +7305,89 @@ mat23.exactEquals = function (a, b) {
  * @returns {Boolean} True if the matrices are equal, false otherwise.
  */
 mat23.equals = function (a, b) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03, a4 = a.m04, a5 = a.m05;
-  var b0 = b.m00, b1 = b.m01, b2 = b.m02, b3 = b.m03, b4 = b.m04, b5 = b.m05;
-  return (
-    Math.abs(a0 - b0) <= EPSILON * Math.max(1.0, Math.abs(a0), Math.abs(b0)) &&
-    Math.abs(a1 - b1) <= EPSILON * Math.max(1.0, Math.abs(a1), Math.abs(b1)) &&
-    Math.abs(a2 - b2) <= EPSILON * Math.max(1.0, Math.abs(a2), Math.abs(b2)) &&
-    Math.abs(a3 - b3) <= EPSILON * Math.max(1.0, Math.abs(a3), Math.abs(b3)) &&
-    Math.abs(a4 - b4) <= EPSILON * Math.max(1.0, Math.abs(a4), Math.abs(b4)) &&
-    Math.abs(a5 - b5) <= EPSILON * Math.max(1.0, Math.abs(a5), Math.abs(b5))
-  );
+    var am = a.m;
+    var bm = b.m;
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3],
+        a4 = am[4],
+        a5 = am[5];
+    var b0 = bm[0],
+        b1 = bm[1],
+        b2 = bm[2],
+        b3 = bm[3],
+        b4 = bm[4],
+        b5 = bm[5];
+    return (
+        Math.abs(a0 - b0) <= EPSILON * Math.max(1.0, Math.abs(a0), Math.abs(b0)) &&
+        Math.abs(a1 - b1) <= EPSILON * Math.max(1.0, Math.abs(a1), Math.abs(b1)) &&
+        Math.abs(a2 - b2) <= EPSILON * Math.max(1.0, Math.abs(a2), Math.abs(b2)) &&
+        Math.abs(a3 - b3) <= EPSILON * Math.max(1.0, Math.abs(a3), Math.abs(b3)) &&
+        Math.abs(a4 - b4) <= EPSILON * Math.max(1.0, Math.abs(a4), Math.abs(b4)) &&
+        Math.abs(a5 - b5) <= EPSILON * Math.max(1.0, Math.abs(a5), Math.abs(b5))
+    );
 };
-
-var _tmp$7 = new Array(16);
 
 var _mat4 = function _mat4(
-  m00, m01, m02, m03,
-  m04, m05, m06, m07,
-  m08, m09, m10, m11,
-  m12, m13, m14, m15
+    m00, m01, m02, m03,
+    m04, m05, m06, m07,
+    m08, m09, m10, m11,
+    m12, m13, m14, m15
 ) {
-  this.m00 = m00;
-  this.m01 = m01;
-  this.m02 = m02;
-  this.m03 = m03;
-  this.m04 = m04;
-  this.m05 = m05;
-  this.m06 = m06;
-  this.m07 = m07;
-  this.m08 = m08;
-  this.m09 = m09;
-  this.m10 = m10;
-  this.m11 = m11;
-  this.m12 = m12;
-  this.m13 = m13;
-  this.m14 = m14;
-  this.m15 = m15;
+    if (m00 !== undefined) {
+        if (m00 instanceof Float32Array) {
+            var deepCopy = m01;
+            if (deepCopy) {
+                this.m = Float32Array.from(m00);
+            } else {
+                this.m = m00;
+            }
+        } else {
+            var m = this.m = new Float32Array(16);
+            m[0] = m00;
+            m[1] = m01;
+            m[2] = m02;
+            m[3] = m03;
+            m[4] = m04;
+            m[5] = m05;
+            m[6] = m06;
+            m[7] = m07;
+            m[8] = m08;
+            m[9] = m09;
+            m[10] = m10;
+            m[11] = m11;
+            m[12] = m12;
+            m[13] = m13;
+            m[14] = m14;
+            m[15] = m15;
+        }
+    } else {
+        var m = this.m = new Float32Array(16);
+        m[0] = 1;
+        m[1] = 0;
+        m[2] = 0;
+        m[3] = 0;
+
+        m[4] = 0;
+        m[5] = 1;
+        m[6] = 0;
+        m[7] = 0;
+
+        m[8] = 0;
+        m[9] = 0;
+        m[10] = 1;
+        m[11] = 0;
+
+        m[12] = 0;
+        m[13] = 0;
+        m[14] = 0;
+        m[15] = 1;
+    }
 };
 
-_mat4.prototype.toJSON = function toJSON () {
-  _tmp$7[0] = this.m00;
-  _tmp$7[1] = this.m01;
-  _tmp$7[2] = this.m02;
-  _tmp$7[3] = this.m03;
-  _tmp$7[4] = this.m04;
-  _tmp$7[5] = this.m05;
-  _tmp$7[6] = this.m06;
-  _tmp$7[7] = this.m07;
-  _tmp$7[8] = this.m08;
-  _tmp$7[9] = this.m09;
-  _tmp$7[10] = this.m10;
-  _tmp$7[11] = this.m11;
-  _tmp$7[12] = this.m12;
-  _tmp$7[13] = this.m13;
-  _tmp$7[14] = this.m14;
-  _tmp$7[15] = this.m15;
-
-  return _tmp$7;
+_mat4.prototype.toJSON = function toJSON() {
+    return this.m;
 };
 
 /**
@@ -7121,12 +7425,7 @@ var mat4 = {};
  * @returns {mat4} a new 4x4 matrix
  */
 mat4.create = function () {
-  return new _mat4(
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1
-  );
+    return new _mat4();
 };
 
 /**
@@ -7151,12 +7450,12 @@ mat4.create = function () {
  * @returns {mat4} A new mat4
  */
 mat4.new = function (m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33) {
-  return new _mat4(
-    m00, m01, m02, m03,
-    m10, m11, m12, m13,
-    m20, m21, m22, m23,
-    m30, m31, m32, m33
-  );
+    return new _mat4(
+        m00, m01, m02, m03,
+        m10, m11, m12, m13,
+        m20, m21, m22, m23,
+        m30, m31, m32, m33
+    );
 };
 
 /**
@@ -7166,12 +7465,7 @@ mat4.new = function (m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23,
  * @returns {mat4} a new 4x4 matrix
  */
 mat4.clone = function (a) {
-  return new _mat4(
-    a.m00, a.m01, a.m02, a.m03,
-    a.m04, a.m05, a.m06, a.m07,
-    a.m08, a.m09, a.m10, a.m11,
-    a.m12, a.m13, a.m14, a.m15
-  );
+    return new _mat4(a.m, true);
 };
 
 /**
@@ -7182,23 +7476,8 @@ mat4.clone = function (a) {
  * @returns {mat4} out
  */
 mat4.copy = function (out, a) {
-  out.m00 = a.m00;
-  out.m01 = a.m01;
-  out.m02 = a.m02;
-  out.m03 = a.m03;
-  out.m04 = a.m04;
-  out.m05 = a.m05;
-  out.m06 = a.m06;
-  out.m07 = a.m07;
-  out.m08 = a.m08;
-  out.m09 = a.m09;
-  out.m10 = a.m10;
-  out.m11 = a.m11;
-  out.m12 = a.m12;
-  out.m13 = a.m13;
-  out.m14 = a.m14;
-  out.m15 = a.m15;
-  return out;
+    out.m.set(a.m);
+    return out;
 };
 
 /**
@@ -7224,23 +7503,24 @@ mat4.copy = function (out, a) {
  * @returns {mat4} out
  */
 mat4.set = function (out, m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33) {
-  out.m00 = m00;
-  out.m01 = m01;
-  out.m02 = m02;
-  out.m03 = m03;
-  out.m04 = m10;
-  out.m05 = m11;
-  out.m06 = m12;
-  out.m07 = m13;
-  out.m08 = m20;
-  out.m09 = m21;
-  out.m10 = m22;
-  out.m11 = m23;
-  out.m12 = m30;
-  out.m13 = m31;
-  out.m14 = m32;
-  out.m15 = m33;
-  return out;
+    var outm = out.m;
+    outm[0] = m00;
+    outm[1] = m01;
+    outm[2] = m02;
+    outm[3] = m03;
+    outm[4] = m10;
+    outm[5] = m11;
+    outm[6] = m12;
+    outm[7] = m13;
+    outm[8] = m20;
+    outm[9] = m21;
+    outm[10] = m22;
+    outm[11] = m23;
+    outm[12] = m30;
+    outm[13] = m31;
+    outm[14] = m32;
+    outm[15] = m33;
+    return out;
 };
 
 
@@ -7251,23 +7531,24 @@ mat4.set = function (out, m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22,
  * @returns {mat4} out
  */
 mat4.identity = function (out) {
-  out.m00 = 1;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 0;
-  out.m04 = 0;
-  out.m05 = 1;
-  out.m06 = 0;
-  out.m07 = 0;
-  out.m08 = 0;
-  out.m09 = 0;
-  out.m10 = 1;
-  out.m11 = 0;
-  out.m12 = 0;
-  out.m13 = 0;
-  out.m14 = 0;
-  out.m15 = 1;
-  return out;
+    var outm = out.m;
+    outm[0] = 1;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 0;
+    outm[4] = 0;
+    outm[5] = 1;
+    outm[6] = 0;
+    outm[7] = 0;
+    outm[8] = 0;
+    outm[9] = 0;
+    outm[10] = 1;
+    outm[11] = 0;
+    outm[12] = 0;
+    outm[13] = 0;
+    outm[14] = 0;
+    outm[15] = 1;
+    return out;
 };
 
 /**
@@ -7278,44 +7559,49 @@ mat4.identity = function (out) {
  * @returns {mat4} out
  */
 mat4.transpose = function (out, a) {
-  // If we are transposing ourselves we can skip a few steps but have to cache some values
-  if (out === a) {
-    var a01 = a.m01, a02 = a.m02, a03 = a.m03,
-        a12 = a.m06, a13 = a.m07,
-        a23 = a.m11;
+    // If we are transposing ourselves we can skip a few steps but have to cache some values
+    var am = a.m;
+    var outm = out.m;
+    if (out === a) {
+        var a01 = am[1],
+            a02 = am[2],
+            a03 = am[3],
+            a12 = am[6],
+            a13 = am[7],
+            a23 = am[11];
 
-    out.m01 = a.m04;
-    out.m02 = a.m08;
-    out.m03 = a.m12;
-    out.m04 = a01;
-    out.m06 = a.m09;
-    out.m07 = a.m13;
-    out.m08 = a02;
-    out.m09 = a12;
-    out.m11 = a.m14;
-    out.m12 = a03;
-    out.m13 = a13;
-    out.m14 = a23;
-  } else {
-    out.m00 = a.m00;
-    out.m01 = a.m04;
-    out.m02 = a.m08;
-    out.m03 = a.m12;
-    out.m04 = a.m01;
-    out.m05 = a.m05;
-    out.m06 = a.m09;
-    out.m07 = a.m13;
-    out.m08 = a.m02;
-    out.m09 = a.m06;
-    out.m10 = a.m10;
-    out.m11 = a.m14;
-    out.m12 = a.m03;
-    out.m13 = a.m07;
-    out.m14 = a.m11;
-    out.m15 = a.m15;
-  }
+        outm[1] = am[4];
+        outm[2] = am[8];
+        outm[3] = am[12];
+        outm[4] = a01;
+        outm[6] = am[9];
+        outm[7] = am[13];
+        outm[8] = a02;
+        outm[9] = a12;
+        outm[11] = am[14];
+        outm[12] = a03;
+        outm[13] = a13;
+        outm[14] = a23;
+    } else {
+        outm[0] = am[0];
+        outm[1] = am[4];
+        outm[2] = am[8];
+        outm[3] = am[12];
+        outm[4] = am[1];
+        outm[5] = am[5];
+        outm[6] = am[9];
+        outm[7] = am[13];
+        outm[8] = am[2];
+        outm[9] = am[6];
+        outm[10] = am[10];
+        outm[11] = am[14];
+        outm[12] = am[3];
+        outm[13] = am[7];
+        outm[14] = am[11];
+        outm[15] = am[15];
+    }
 
-  return out;
+    return out;
 };
 
 /**
@@ -7326,50 +7612,64 @@ mat4.transpose = function (out, a) {
  * @returns {mat4} out
  */
 mat4.invert = function (out, a) {
-  var a00 = a.m00, a01 = a.m01, a02 = a.m02, a03 = a.m03,
-      a10 = a.m04, a11 = a.m05, a12 = a.m06, a13 = a.m07,
-      a20 = a.m08, a21 = a.m09, a22 = a.m10, a23 = a.m11,
-      a30 = a.m12, a31 = a.m13, a32 = a.m14, a33 = a.m15;
+    var am = a.m;
+    var a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a03 = am[3],
+        a10 = am[4],
+        a11 = am[5],
+        a12 = am[6],
+        a13 = am[7],
+        a20 = am[8],
+        a21 = am[9],
+        a22 = am[10],
+        a23 = am[11],
+        a30 = am[12],
+        a31 = am[13],
+        a32 = am[14],
+        a33 = am[15];
 
-  var b00 = a00 * a11 - a01 * a10;
-  var b01 = a00 * a12 - a02 * a10;
-  var b02 = a00 * a13 - a03 * a10;
-  var b03 = a01 * a12 - a02 * a11;
-  var b04 = a01 * a13 - a03 * a11;
-  var b05 = a02 * a13 - a03 * a12;
-  var b06 = a20 * a31 - a21 * a30;
-  var b07 = a20 * a32 - a22 * a30;
-  var b08 = a20 * a33 - a23 * a30;
-  var b09 = a21 * a32 - a22 * a31;
-  var b10 = a21 * a33 - a23 * a31;
-  var b11 = a22 * a33 - a23 * a32;
+    var b00 = a00 * a11 - a01 * a10;
+    var b01 = a00 * a12 - a02 * a10;
+    var b02 = a00 * a13 - a03 * a10;
+    var b03 = a01 * a12 - a02 * a11;
+    var b04 = a01 * a13 - a03 * a11;
+    var b05 = a02 * a13 - a03 * a12;
+    var b06 = a20 * a31 - a21 * a30;
+    var b07 = a20 * a32 - a22 * a30;
+    var b08 = a20 * a33 - a23 * a30;
+    var b09 = a21 * a32 - a22 * a31;
+    var b10 = a21 * a33 - a23 * a31;
+    var b11 = a22 * a33 - a23 * a32;
 
-  // Calculate the determinant
-  var det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+    // Calculate the determinant
+    var det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
 
-  if (!det) {
-    return null;
-  }
-  det = 1.0 / det;
+    if (!det) {
+        return null;
+    }
+    det = 1.0 / det;
 
-  out.m00 = (a11 * b11 - a12 * b10 + a13 * b09) * det;
-  out.m01 = (a02 * b10 - a01 * b11 - a03 * b09) * det;
-  out.m02 = (a31 * b05 - a32 * b04 + a33 * b03) * det;
-  out.m03 = (a22 * b04 - a21 * b05 - a23 * b03) * det;
-  out.m04 = (a12 * b08 - a10 * b11 - a13 * b07) * det;
-  out.m05 = (a00 * b11 - a02 * b08 + a03 * b07) * det;
-  out.m06 = (a32 * b02 - a30 * b05 - a33 * b01) * det;
-  out.m07 = (a20 * b05 - a22 * b02 + a23 * b01) * det;
-  out.m08 = (a10 * b10 - a11 * b08 + a13 * b06) * det;
-  out.m09 = (a01 * b08 - a00 * b10 - a03 * b06) * det;
-  out.m10 = (a30 * b04 - a31 * b02 + a33 * b00) * det;
-  out.m11 = (a21 * b02 - a20 * b04 - a23 * b00) * det;
-  out.m12 = (a11 * b07 - a10 * b09 - a12 * b06) * det;
-  out.m13 = (a00 * b09 - a01 * b07 + a02 * b06) * det;
-  out.m14 = (a31 * b01 - a30 * b03 - a32 * b00) * det;
-  out.m15 = (a20 * b03 - a21 * b01 + a22 * b00) * det;
+    var outm = out.m;
+    outm[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
+    outm[1] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
+    outm[2] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
+    outm[3] = (a22 * b04 - a21 * b05 - a23 * b03) * det;
+    outm[4] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
+    outm[5] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
+    outm[6] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
+    outm[7] = (a20 * b05 - a22 * b02 + a23 * b01) * det;
+    outm[8] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
+    outm[9] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+    outm[10] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
+    outm[11] = (a21 * b02 - a20 * b04 - a23 * b00) * det;
+    outm[12] = (a11 * b07 - a10 * b09 - a12 * b06) * det;
+    outm[13] = (a00 * b09 - a01 * b07 + a02 * b06) * det;
+    outm[14] = (a31 * b01 - a30 * b03 - a32 * b00) * det;
+    outm[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
 
-  return out;
+    return out;
 };
 
 /**
@@ -7380,28 +7680,42 @@ mat4.invert = function (out, a) {
  * @returns {mat4} out
  */
 mat4.adjoint = function (out, a) {
-  var a00 = a.m00, a01 = a.m01, a02 = a.m02, a03 = a.m03,
-      a10 = a.m04, a11 = a.m05, a12 = a.m06, a13 = a.m07,
-      a20 = a.m08, a21 = a.m09, a22 = a.m10, a23 = a.m11,
-      a30 = a.m12, a31 = a.m13, a32 = a.m14, a33 = a.m15;
+    var am = a.m;
+    var a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a03 = am[3],
+        a10 = am[4],
+        a11 = am[5],
+        a12 = am[6],
+        a13 = am[7],
+        a20 = am[8],
+        a21 = am[9],
+        a22 = am[10],
+        a23 = am[11],
+        a30 = am[12],
+        a31 = am[13],
+        a32 = am[14],
+        a33 = am[15];
 
-  out.m00 = (a11 * (a22 * a33 - a23 * a32) - a21 * (a12 * a33 - a13 * a32) + a31 * (a12 * a23 - a13 * a22));
-  out.m01 = -(a01 * (a22 * a33 - a23 * a32) - a21 * (a02 * a33 - a03 * a32) + a31 * (a02 * a23 - a03 * a22));
-  out.m02 = (a01 * (a12 * a33 - a13 * a32) - a11 * (a02 * a33 - a03 * a32) + a31 * (a02 * a13 - a03 * a12));
-  out.m03 = -(a01 * (a12 * a23 - a13 * a22) - a11 * (a02 * a23 - a03 * a22) + a21 * (a02 * a13 - a03 * a12));
-  out.m04 = -(a10 * (a22 * a33 - a23 * a32) - a20 * (a12 * a33 - a13 * a32) + a30 * (a12 * a23 - a13 * a22));
-  out.m05 = (a00 * (a22 * a33 - a23 * a32) - a20 * (a02 * a33 - a03 * a32) + a30 * (a02 * a23 - a03 * a22));
-  out.m06 = -(a00 * (a12 * a33 - a13 * a32) - a10 * (a02 * a33 - a03 * a32) + a30 * (a02 * a13 - a03 * a12));
-  out.m07 = (a00 * (a12 * a23 - a13 * a22) - a10 * (a02 * a23 - a03 * a22) + a20 * (a02 * a13 - a03 * a12));
-  out.m08 = (a10 * (a21 * a33 - a23 * a31) - a20 * (a11 * a33 - a13 * a31) + a30 * (a11 * a23 - a13 * a21));
-  out.m09 = -(a00 * (a21 * a33 - a23 * a31) - a20 * (a01 * a33 - a03 * a31) + a30 * (a01 * a23 - a03 * a21));
-  out.m10 = (a00 * (a11 * a33 - a13 * a31) - a10 * (a01 * a33 - a03 * a31) + a30 * (a01 * a13 - a03 * a11));
-  out.m11 = -(a00 * (a11 * a23 - a13 * a21) - a10 * (a01 * a23 - a03 * a21) + a20 * (a01 * a13 - a03 * a11));
-  out.m12 = -(a10 * (a21 * a32 - a22 * a31) - a20 * (a11 * a32 - a12 * a31) + a30 * (a11 * a22 - a12 * a21));
-  out.m13 = (a00 * (a21 * a32 - a22 * a31) - a20 * (a01 * a32 - a02 * a31) + a30 * (a01 * a22 - a02 * a21));
-  out.m14 = -(a00 * (a11 * a32 - a12 * a31) - a10 * (a01 * a32 - a02 * a31) + a30 * (a01 * a12 - a02 * a11));
-  out.m15 = (a00 * (a11 * a22 - a12 * a21) - a10 * (a01 * a22 - a02 * a21) + a20 * (a01 * a12 - a02 * a11));
-  return out;
+    var outm = out.m;
+    outm[0] = (a11 * (a22 * a33 - a23 * a32) - a21 * (a12 * a33 - a13 * a32) + a31 * (a12 * a23 - a13 * a22));
+    outm[1] = -(a01 * (a22 * a33 - a23 * a32) - a21 * (a02 * a33 - a03 * a32) + a31 * (a02 * a23 - a03 * a22));
+    outm[2] = (a01 * (a12 * a33 - a13 * a32) - a11 * (a02 * a33 - a03 * a32) + a31 * (a02 * a13 - a03 * a12));
+    outm[3] = -(a01 * (a12 * a23 - a13 * a22) - a11 * (a02 * a23 - a03 * a22) + a21 * (a02 * a13 - a03 * a12));
+    outm[4] = -(a10 * (a22 * a33 - a23 * a32) - a20 * (a12 * a33 - a13 * a32) + a30 * (a12 * a23 - a13 * a22));
+    outm[5] = (a00 * (a22 * a33 - a23 * a32) - a20 * (a02 * a33 - a03 * a32) + a30 * (a02 * a23 - a03 * a22));
+    outm[6] = -(a00 * (a12 * a33 - a13 * a32) - a10 * (a02 * a33 - a03 * a32) + a30 * (a02 * a13 - a03 * a12));
+    outm[7] = (a00 * (a12 * a23 - a13 * a22) - a10 * (a02 * a23 - a03 * a22) + a20 * (a02 * a13 - a03 * a12));
+    outm[8] = (a10 * (a21 * a33 - a23 * a31) - a20 * (a11 * a33 - a13 * a31) + a30 * (a11 * a23 - a13 * a21));
+    outm[9] = -(a00 * (a21 * a33 - a23 * a31) - a20 * (a01 * a33 - a03 * a31) + a30 * (a01 * a23 - a03 * a21));
+    outm[10] = (a00 * (a11 * a33 - a13 * a31) - a10 * (a01 * a33 - a03 * a31) + a30 * (a01 * a13 - a03 * a11));
+    outm[11] = -(a00 * (a11 * a23 - a13 * a21) - a10 * (a01 * a23 - a03 * a21) + a20 * (a01 * a13 - a03 * a11));
+    outm[12] = -(a10 * (a21 * a32 - a22 * a31) - a20 * (a11 * a32 - a12 * a31) + a30 * (a11 * a22 - a12 * a21));
+    outm[13] = (a00 * (a21 * a32 - a22 * a31) - a20 * (a01 * a32 - a02 * a31) + a30 * (a01 * a22 - a02 * a21));
+    outm[14] = -(a00 * (a11 * a32 - a12 * a31) - a10 * (a01 * a32 - a02 * a31) + a30 * (a01 * a12 - a02 * a11));
+    outm[15] = (a00 * (a11 * a22 - a12 * a21) - a10 * (a01 * a22 - a02 * a21) + a20 * (a01 * a12 - a02 * a11));
+    return out;
 };
 
 /**
@@ -7411,26 +7725,39 @@ mat4.adjoint = function (out, a) {
  * @returns {Number} determinant of a
  */
 mat4.determinant = function (a) {
-  var a00 = a.m00, a01 = a.m01, a02 = a.m02, a03 = a.m03,
-      a10 = a.m04, a11 = a.m05, a12 = a.m06, a13 = a.m07,
-      a20 = a.m08, a21 = a.m09, a22 = a.m10, a23 = a.m11,
-      a30 = a.m12, a31 = a.m13, a32 = a.m14, a33 = a.m15;
+    var am = a.m;
+    var a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a03 = am[3],
+        a10 = am[4],
+        a11 = am[5],
+        a12 = am[6],
+        a13 = am[7],
+        a20 = am[8],
+        a21 = am[9],
+        a22 = am[10],
+        a23 = am[11],
+        a30 = am[12],
+        a31 = am[13],
+        a32 = am[14],
+        a33 = am[15];
 
-  var b00 = a00 * a11 - a01 * a10;
-  var b01 = a00 * a12 - a02 * a10;
-  var b02 = a00 * a13 - a03 * a10;
-  var b03 = a01 * a12 - a02 * a11;
-  var b04 = a01 * a13 - a03 * a11;
-  var b05 = a02 * a13 - a03 * a12;
-  var b06 = a20 * a31 - a21 * a30;
-  var b07 = a20 * a32 - a22 * a30;
-  var b08 = a20 * a33 - a23 * a30;
-  var b09 = a21 * a32 - a22 * a31;
-  var b10 = a21 * a33 - a23 * a31;
-  var b11 = a22 * a33 - a23 * a32;
+    var b00 = a00 * a11 - a01 * a10;
+    var b01 = a00 * a12 - a02 * a10;
+    var b02 = a00 * a13 - a03 * a10;
+    var b03 = a01 * a12 - a02 * a11;
+    var b04 = a01 * a13 - a03 * a11;
+    var b05 = a02 * a13 - a03 * a12;
+    var b06 = a20 * a31 - a21 * a30;
+    var b07 = a20 * a32 - a22 * a30;
+    var b08 = a20 * a33 - a23 * a30;
+    var b09 = a21 * a32 - a22 * a31;
+    var b10 = a21 * a33 - a23 * a31;
+    var b11 = a22 * a33 - a23 * a32;
 
-  // Calculate the determinant
-  return b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+    // Calculate the determinant
+    return b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
 };
 
 /**
@@ -7442,36 +7769,63 @@ mat4.determinant = function (a) {
  * @returns {mat4} out
  */
 mat4.multiply = function (out, a, b) {
-  var a00 = a.m00, a01 = a.m01, a02 = a.m02, a03 = a.m03,
-      a10 = a.m04, a11 = a.m05, a12 = a.m06, a13 = a.m07,
-      a20 = a.m08, a21 = a.m09, a22 = a.m10, a23 = a.m11,
-      a30 = a.m12, a31 = a.m13, a32 = a.m14, a33 = a.m15;
+    var am = a.m;
+    var a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a03 = am[3],
+        a10 = am[4],
+        a11 = am[5],
+        a12 = am[6],
+        a13 = am[7],
+        a20 = am[8],
+        a21 = am[9],
+        a22 = am[10],
+        a23 = am[11],
+        a30 = am[12],
+        a31 = am[13],
+        a32 = am[14],
+        a33 = am[15];
 
-  // Cache only the current line of the second matrix
-  var b0 = b.m00, b1 = b.m01, b2 = b.m02, b3 = b.m03;
-  out.m00 = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
-  out.m01 = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
-  out.m02 = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
-  out.m03 = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+    var outm = out.m;
+    var bm = b.m;
+    // Cache only the current line of the second matrix
+    var b0 = bm[0],
+        b1 = bm[1],
+        b2 = bm[2],
+        b3 = bm[3];
+    outm[0] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+    outm[1] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+    outm[2] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+    outm[3] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
 
-  b0 = b.m04; b1 = b.m05; b2 = b.m06; b3 = b.m07;
-  out.m04 = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
-  out.m05 = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
-  out.m06 = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
-  out.m07 = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+    b0 = bm[4];
+    b1 = bm[5];
+    b2 = bm[6];
+    b3 = bm[7];
+    outm[4] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+    outm[5] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+    outm[6] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+    outm[7] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
 
-  b0 = b.m08; b1 = b.m09; b2 = b.m10; b3 = b.m11;
-  out.m08 = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
-  out.m09 = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
-  out.m10 = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
-  out.m11 = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+    b0 = bm[8];
+    b1 = bm[9];
+    b2 = bm[10];
+    b3 = bm[11];
+    outm[8] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+    outm[9] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+    outm[10] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+    outm[11] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
 
-  b0 = b.m12; b1 = b.m13; b2 = b.m14; b3 = b.m15;
-  out.m12 = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
-  out.m13 = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
-  out.m14 = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
-  out.m15 = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
-  return out;
+    b0 = bm[12];
+    b1 = bm[13];
+    b2 = bm[14];
+    b3 = bm[15];
+    outm[12] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+    outm[13] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+    outm[14] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+    outm[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+    return out;
 };
 
 /**
@@ -7489,32 +7843,54 @@ mat4.mul = mat4.multiply;
  * @returns {mat4} out
  */
 mat4.translate = function (out, a, v) {
-  var x = v.x, y = v.y, z = v.z,
-      a00, a01, a02, a03,
-      a10, a11, a12, a13,
-      a20, a21, a22, a23;
+    var x = v.x,
+        y = v.y,
+        z = v.z,
+        a00, a01, a02, a03,
+        a10, a11, a12, a13,
+        a20, a21, a22, a23;
 
-  if (a === out) {
-    out.m12 = a.m00 * x + a.m04 * y + a.m08 * z + a.m12;
-    out.m13 = a.m01 * x + a.m05 * y + a.m09 * z + a.m13;
-    out.m14 = a.m02 * x + a.m06 * y + a.m10 * z + a.m14;
-    out.m15 = a.m03 * x + a.m07 * y + a.m11 * z + a.m15;
-  } else {
-    a00 = a.m00; a01 = a.m01; a02 = a.m02; a03 = a.m03;
-    a10 = a.m04; a11 = a.m05; a12 = a.m06; a13 = a.m07;
-    a20 = a.m08; a21 = a.m09; a22 = a.m10; a23 = a.m11;
+    var outm = out.m;
+    var am = a.m;
+    if (a === out) {
+        outm[12] = am[0] * x + am[4] * y + am[8] * z + am[12];
+        outm[13] = am[1] * x + am[5] * y + am[9] * z + am[13];
+        outm[14] = am[2] * x + am[6] * y + am[10] * z + am[14];
+        outm[15] = am[3] * x + am[7] * y + am[11] * z + am[15];
+    } else {
+        a00 = am[0];
+        a01 = am[1];
+        a02 = am[2];
+        a03 = am[3];
+        a10 = am[4];
+        a11 = am[5];
+        a12 = am[6];
+        a13 = am[7];
+        a20 = am[8];
+        a21 = am[9];
+        a22 = am[10];
+        a23 = am[11];
 
-    out.m00 = a00; out.m01 = a01; out.m02 = a02; out.m03 = a03;
-    out.m04 = a10; out.m05 = a11; out.m06 = a12; out.m07 = a13;
-    out.m08 = a20; out.m09 = a21; out.m10 = a22; out.m11 = a23;
+        outm[0] = a00;
+        outm[1] = a01;
+        outm[2] = a02;
+        outm[3] = a03;
+        outm[4] = a10;
+        outm[5] = a11;
+        outm[6] = a12;
+        outm[7] = a13;
+        outm[8] = a20;
+        outm[9] = a21;
+        outm[10] = a22;
+        outm[11] = a23;
 
-    out.m12 = a00 * x + a10 * y + a20 * z + a.m12;
-    out.m13 = a01 * x + a11 * y + a21 * z + a.m13;
-    out.m14 = a02 * x + a12 * y + a22 * z + a.m14;
-    out.m15 = a03 * x + a13 * y + a23 * z + a.m15;
-  }
+        outm[12] = a00 * x + a10 * y + a20 * z + am[12];
+        outm[13] = a01 * x + a11 * y + a21 * z + am[13];
+        outm[14] = a02 * x + a12 * y + a22 * z + am[14];
+        outm[15] = a03 * x + a13 * y + a23 * z + am[15];
+    }
 
-  return out;
+    return out;
 };
 
 /**
@@ -7526,25 +7902,29 @@ mat4.translate = function (out, a, v) {
  * @returns {mat4} out
  **/
 mat4.scale = function (out, a, v) {
-  var x = v.x, y = v.y, z = v.z;
+    var x = v.x,
+        y = v.y,
+        z = v.z;
 
-  out.m00 = a.m00 * x;
-  out.m01 = a.m01 * x;
-  out.m02 = a.m02 * x;
-  out.m03 = a.m03 * x;
-  out.m04 = a.m04 * y;
-  out.m05 = a.m05 * y;
-  out.m06 = a.m06 * y;
-  out.m07 = a.m07 * y;
-  out.m08 = a.m08 * z;
-  out.m09 = a.m09 * z;
-  out.m10 = a.m10 * z;
-  out.m11 = a.m11 * z;
-  out.m12 = a.m12;
-  out.m13 = a.m13;
-  out.m14 = a.m14;
-  out.m15 = a.m15;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    outm[0] = am[0] * x;
+    outm[1] = am[1] * x;
+    outm[2] = am[2] * x;
+    outm[3] = am[3] * x;
+    outm[4] = am[4] * y;
+    outm[5] = am[5] * y;
+    outm[6] = am[6] * y;
+    outm[7] = am[7] * y;
+    outm[8] = am[8] * z;
+    outm[9] = am[9] * z;
+    outm[10] = am[10] * z;
+    outm[11] = am[11] * z;
+    outm[12] = am[12];
+    outm[13] = am[13];
+    outm[14] = am[14];
+    outm[15] = am[15];
+    return out;
 };
 
 /**
@@ -7557,62 +7937,81 @@ mat4.scale = function (out, a, v) {
  * @returns {mat4} out
  */
 mat4.rotate = function (out, a, rad, axis) {
-  var x = axis.x, y = axis.y, z = axis.z;
-  var s, c, t,
-      a00, a01, a02, a03,
-      a10, a11, a12, a13,
-      a20, a21, a22, a23,
-      b00, b01, b02,
-      b10, b11, b12,
-      b20, b21, b22;
+    var x = axis.x,
+        y = axis.y,
+        z = axis.z;
+    var s, c, t,
+        a00, a01, a02, a03,
+        a10, a11, a12, a13,
+        a20, a21, a22, a23,
+        b00, b01, b02,
+        b10, b11, b12,
+        b20, b21, b22;
 
-  var len = Math.sqrt(x * x + y * y + z * z);
+    var len = Math.sqrt(x * x + y * y + z * z);
 
-  if (Math.abs(len) < EPSILON) {
-    return null;
-  }
+    if (Math.abs(len) < EPSILON) {
+        return null;
+    }
 
-  len = 1 / len;
-  x *= len;
-  y *= len;
-  z *= len;
+    len = 1 / len;
+    x *= len;
+    y *= len;
+    z *= len;
 
-  s = Math.sin(rad);
-  c = Math.cos(rad);
-  t = 1 - c;
+    s = Math.sin(rad);
+    c = Math.cos(rad);
+    t = 1 - c;
 
-  a00 = a.m00; a01 = a.m01; a02 = a.m02; a03 = a.m03;
-  a10 = a.m04; a11 = a.m05; a12 = a.m06; a13 = a.m07;
-  a20 = a.m08; a21 = a.m09; a22 = a.m10; a23 = a.m11;
+    var am = a.m;
+    a00 = am[0];
+    a01 = am[1];
+    a02 = am[2];
+    a03 = am[3];
+    a10 = am[4];
+    a11 = am[5];
+    a12 = am[6];
+    a13 = am[7];
+    a20 = am[8];
+    a21 = am[9];
+    a22 = am[10];
+    a23 = am[11];
 
-  // Construct the elements of the rotation matrix
-  b00 = x * x * t + c; b01 = y * x * t + z * s; b02 = z * x * t - y * s;
-  b10 = x * y * t - z * s; b11 = y * y * t + c; b12 = z * y * t + x * s;
-  b20 = x * z * t + y * s; b21 = y * z * t - x * s; b22 = z * z * t + c;
+    // Construct the elements of the rotation matrix
+    b00 = x * x * t + c;
+    b01 = y * x * t + z * s;
+    b02 = z * x * t - y * s;
+    b10 = x * y * t - z * s;
+    b11 = y * y * t + c;
+    b12 = z * y * t + x * s;
+    b20 = x * z * t + y * s;
+    b21 = y * z * t - x * s;
+    b22 = z * z * t + c;
 
-  // Perform rotation-specific matrix multiplication
-  out.m00 = a00 * b00 + a10 * b01 + a20 * b02;
-  out.m01 = a01 * b00 + a11 * b01 + a21 * b02;
-  out.m02 = a02 * b00 + a12 * b01 + a22 * b02;
-  out.m03 = a03 * b00 + a13 * b01 + a23 * b02;
-  out.m04 = a00 * b10 + a10 * b11 + a20 * b12;
-  out.m05 = a01 * b10 + a11 * b11 + a21 * b12;
-  out.m06 = a02 * b10 + a12 * b11 + a22 * b12;
-  out.m07 = a03 * b10 + a13 * b11 + a23 * b12;
-  out.m08 = a00 * b20 + a10 * b21 + a20 * b22;
-  out.m09 = a01 * b20 + a11 * b21 + a21 * b22;
-  out.m10 = a02 * b20 + a12 * b21 + a22 * b22;
-  out.m11 = a03 * b20 + a13 * b21 + a23 * b22;
+    // Perform rotation-specific matrix multiplication
+    var outm = out.m;
+    outm[0] = a00 * b00 + a10 * b01 + a20 * b02;
+    outm[1] = a01 * b00 + a11 * b01 + a21 * b02;
+    outm[2] = a02 * b00 + a12 * b01 + a22 * b02;
+    outm[3] = a03 * b00 + a13 * b01 + a23 * b02;
+    outm[4] = a00 * b10 + a10 * b11 + a20 * b12;
+    outm[5] = a01 * b10 + a11 * b11 + a21 * b12;
+    outm[6] = a02 * b10 + a12 * b11 + a22 * b12;
+    outm[7] = a03 * b10 + a13 * b11 + a23 * b12;
+    outm[8] = a00 * b20 + a10 * b21 + a20 * b22;
+    outm[9] = a01 * b20 + a11 * b21 + a21 * b22;
+    outm[10] = a02 * b20 + a12 * b21 + a22 * b22;
+    outm[11] = a03 * b20 + a13 * b21 + a23 * b22;
 
-  // If the source and destination differ, copy the unchanged last row
-  if (a !== out) {
-    out.m12 = a.m12;
-    out.m13 = a.m13;
-    out.m14 = a.m14;
-    out.m15 = a.m15;
-  }
+    // If the source and destination differ, copy the unchanged last row
+    if (a !== out) {
+        outm[12] = am[12];
+        outm[13] = am[13];
+        outm[14] = am[14];
+        outm[15] = am[15];
+    }
 
-  return out;
+    return out;
 };
 
 /**
@@ -7624,39 +8023,44 @@ mat4.rotate = function (out, a, rad, axis) {
  * @returns {mat4} out
  */
 mat4.rotateX = function (out, a, rad) {
-  var s = Math.sin(rad),
-      c = Math.cos(rad),
-      a10 = a.m04,
-      a11 = a.m05,
-      a12 = a.m06,
-      a13 = a.m07,
-      a20 = a.m08,
-      a21 = a.m09,
-      a22 = a.m10,
-      a23 = a.m11;
+    var am = a.m;
+    var outm = out.m;
 
-  if (a !== out) { // If the source and destination differ, copy the unchanged rows
-    out.m00 = a.m00;
-    out.m01 = a.m01;
-    out.m02 = a.m02;
-    out.m03 = a.m03;
-    out.m12 = a.m12;
-    out.m13 = a.m13;
-    out.m14 = a.m14;
-    out.m15 = a.m15;
-  }
+    var s = Math.sin(rad),
+        c = Math.cos(rad),
 
-  // Perform axis-specific matrix multiplication
-  out.m04 = a10 * c + a20 * s;
-  out.m05 = a11 * c + a21 * s;
-  out.m06 = a12 * c + a22 * s;
-  out.m07 = a13 * c + a23 * s;
-  out.m08 = a20 * c - a10 * s;
-  out.m09 = a21 * c - a11 * s;
-  out.m10 = a22 * c - a12 * s;
-  out.m11 = a23 * c - a13 * s;
+        a10 = am[4],
+        a11 = am[5],
+        a12 = am[6],
+        a13 = am[7],
+        a20 = am[8],
+        a21 = am[9],
+        a22 = am[10],
+        a23 = am[11];
 
-  return out;
+    if (a !== out) { // If the source and destination differ, copy the unchanged rows
+
+        outm[0] = am[0];
+        outm[1] = am[1];
+        outm[2] = am[2];
+        outm[3] = am[3];
+        outm[12] = am[12];
+        outm[13] = am[13];
+        outm[14] = am[14];
+        outm[15] = am[15];
+    }
+
+    // Perform axis-specific matrix multiplication
+    outm[4] = a10 * c + a20 * s;
+    outm[5] = a11 * c + a21 * s;
+    outm[6] = a12 * c + a22 * s;
+    outm[7] = a13 * c + a23 * s;
+    outm[8] = a20 * c - a10 * s;
+    outm[9] = a21 * c - a11 * s;
+    outm[10] = a22 * c - a12 * s;
+    outm[11] = a23 * c - a13 * s;
+
+    return out;
 };
 
 /**
@@ -7668,39 +8072,42 @@ mat4.rotateX = function (out, a, rad) {
  * @returns {mat4} out
  */
 mat4.rotateY = function (out, a, rad) {
-  var s = Math.sin(rad),
-      c = Math.cos(rad),
-      a00 = a.m00,
-      a01 = a.m01,
-      a02 = a.m02,
-      a03 = a.m03,
-      a20 = a.m08,
-      a21 = a.m09,
-      a22 = a.m10,
-      a23 = a.m11;
+    var am = a.m;
+    var outm = out.m;
 
-  if (a !== out) { // If the source and destination differ, copy the unchanged rows
-    out.m04 = a.m04;
-    out.m05 = a.m05;
-    out.m06 = a.m06;
-    out.m07 = a.m07;
-    out.m12 = a.m12;
-    out.m13 = a.m13;
-    out.m14 = a.m14;
-    out.m15 = a.m15;
-  }
+    var s = Math.sin(rad),
+        c = Math.cos(rad),
+        a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a03 = am[3],
+        a20 = am[8],
+        a21 = am[9],
+        a22 = am[10],
+        a23 = am[11];
 
-  // Perform axis-specific matrix multiplication
-  out.m00 = a00 * c - a20 * s;
-  out.m01 = a01 * c - a21 * s;
-  out.m02 = a02 * c - a22 * s;
-  out.m03 = a03 * c - a23 * s;
-  out.m08 = a00 * s + a20 * c;
-  out.m09 = a01 * s + a21 * c;
-  out.m10 = a02 * s + a22 * c;
-  out.m11 = a03 * s + a23 * c;
+    if (a !== out) { // If the source and destination differ, copy the unchanged rows
+        outm[4] = am[4];
+        outm[5] = am[5];
+        outm[6] = am[6];
+        outm[7] = am[7];
+        outm[12] = am[12];
+        outm[13] = am[13];
+        outm[14] = am[14];
+        outm[15] = am[15];
+    }
 
-  return out;
+    // Perform axis-specific matrix multiplication
+    outm[0] = a00 * c - a20 * s;
+    outm[1] = a01 * c - a21 * s;
+    outm[2] = a02 * c - a22 * s;
+    outm[3] = a03 * c - a23 * s;
+    outm[8] = a00 * s + a20 * c;
+    outm[9] = a01 * s + a21 * c;
+    outm[10] = a02 * s + a22 * c;
+    outm[11] = a03 * s + a23 * c;
+
+    return out;
 };
 
 /**
@@ -7712,40 +8119,43 @@ mat4.rotateY = function (out, a, rad) {
  * @returns {mat4} out
  */
 mat4.rotateZ = function (out, a, rad) {
-  var s = Math.sin(rad),
-      c = Math.cos(rad),
-      a00 = a.m00,
-      a01 = a.m01,
-      a02 = a.m02,
-      a03 = a.m03,
-      a10 = a.m04,
-      a11 = a.m05,
-      a12 = a.m06,
-      a13 = a.m07;
+    var am = a.m;
+    var outm = out.m;
 
-  // If the source and destination differ, copy the unchanged last row
-  if (a !== out) {
-    out.m08 = a.m08;
-    out.m09 = a.m09;
-    out.m10 = a.m10;
-    out.m11 = a.m11;
-    out.m12 = a.m12;
-    out.m13 = a.m13;
-    out.m14 = a.m14;
-    out.m15 = a.m15;
-  }
+    var s = Math.sin(rad),
+        c = Math.cos(rad),
+        a00 = am[0],
+        a01 = am[1],
+        a02 = am[2],
+        a03 = am[3],
+        a10 = am[4],
+        a11 = am[5],
+        a12 = am[6],
+        a13 = am[7];
 
-  // Perform axis-specific matrix multiplication
-  out.m00 = a00 * c + a10 * s;
-  out.m01 = a01 * c + a11 * s;
-  out.m02 = a02 * c + a12 * s;
-  out.m03 = a03 * c + a13 * s;
-  out.m04 = a10 * c - a00 * s;
-  out.m05 = a11 * c - a01 * s;
-  out.m06 = a12 * c - a02 * s;
-  out.m07 = a13 * c - a03 * s;
+    // If the source and destination differ, copy the unchanged last row
+    if (a !== out) {
+        outm[8] = am[8];
+        outm[9] = am[9];
+        outm[10] = am[10];
+        outm[11] = am[11];
+        outm[12] = am[12];
+        outm[13] = am[13];
+        outm[14] = am[14];
+        outm[15] = am[15];
+    }
 
-  return out;
+    // Perform axis-specific matrix multiplication
+    outm[0] = a00 * c + a10 * s;
+    outm[1] = a01 * c + a11 * s;
+    outm[2] = a02 * c + a12 * s;
+    outm[3] = a03 * c + a13 * s;
+    outm[4] = a10 * c - a00 * s;
+    outm[5] = a11 * c - a01 * s;
+    outm[6] = a12 * c - a02 * s;
+    outm[7] = a13 * c - a03 * s;
+
+    return out;
 };
 
 /**
@@ -7760,23 +8170,24 @@ mat4.rotateZ = function (out, a, rad) {
  * @returns {mat4} out
  */
 mat4.fromTranslation = function (out, v) {
-  out.m00 = 1;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 0;
-  out.m04 = 0;
-  out.m05 = 1;
-  out.m06 = 0;
-  out.m07 = 0;
-  out.m08 = 0;
-  out.m09 = 0;
-  out.m10 = 1;
-  out.m11 = 0;
-  out.m12 = v.x;
-  out.m13 = v.y;
-  out.m14 = v.z;
-  out.m15 = 1;
-  return out;
+    var outm = out.m;
+    outm[0] = 1;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 0;
+    outm[4] = 0;
+    outm[5] = 1;
+    outm[6] = 0;
+    outm[7] = 0;
+    outm[8] = 0;
+    outm[9] = 0;
+    outm[10] = 1;
+    outm[11] = 0;
+    outm[12] = v.x;
+    outm[13] = v.y;
+    outm[14] = v.z;
+    outm[15] = 1;
+    return out;
 };
 
 /**
@@ -7791,23 +8202,24 @@ mat4.fromTranslation = function (out, v) {
  * @returns {mat4} out
  */
 mat4.fromScaling = function (out, v) {
-  out.m00 = v.x;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 0;
-  out.m04 = 0;
-  out.m05 = v.y;
-  out.m06 = 0;
-  out.m07 = 0;
-  out.m08 = 0;
-  out.m09 = 0;
-  out.m10 = v.z;
-  out.m11 = 0;
-  out.m12 = 0;
-  out.m13 = 0;
-  out.m14 = 0;
-  out.m15 = 1;
-  return out;
+    var outm = out.m;
+    outm[0] = v.x;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 0;
+    outm[4] = 0;
+    outm[5] = v.y;
+    outm[6] = 0;
+    outm[7] = 0;
+    outm[8] = 0;
+    outm[9] = 0;
+    outm[10] = v.z;
+    outm[11] = 0;
+    outm[12] = 0;
+    outm[13] = 0;
+    outm[14] = 0;
+    outm[15] = 1;
+    return out;
 };
 
 /**
@@ -7823,41 +8235,44 @@ mat4.fromScaling = function (out, v) {
  * @returns {mat4} out
  */
 mat4.fromRotation = function (out, rad, axis) {
-  var x = axis.x, y = axis.y, z = axis.z;
-  var len = Math.sqrt(x * x + y * y + z * z);
-  var s, c, t;
+    var x = axis.x,
+        y = axis.y,
+        z = axis.z;
+    var len = Math.sqrt(x * x + y * y + z * z);
+    var s, c, t;
 
-  if (Math.abs(len) < EPSILON) {
-    return null;
-  }
+    if (Math.abs(len) < EPSILON) {
+        return null;
+    }
 
-  len = 1 / len;
-  x *= len;
-  y *= len;
-  z *= len;
+    len = 1 / len;
+    x *= len;
+    y *= len;
+    z *= len;
 
-  s = Math.sin(rad);
-  c = Math.cos(rad);
-  t = 1 - c;
+    s = Math.sin(rad);
+    c = Math.cos(rad);
+    t = 1 - c;
 
-  // Perform rotation-specific matrix multiplication
-  out.m00 = x * x * t + c;
-  out.m01 = y * x * t + z * s;
-  out.m02 = z * x * t - y * s;
-  out.m03 = 0;
-  out.m04 = x * y * t - z * s;
-  out.m05 = y * y * t + c;
-  out.m06 = z * y * t + x * s;
-  out.m07 = 0;
-  out.m08 = x * z * t + y * s;
-  out.m09 = y * z * t - x * s;
-  out.m10 = z * z * t + c;
-  out.m11 = 0;
-  out.m12 = 0;
-  out.m13 = 0;
-  out.m14 = 0;
-  out.m15 = 1;
-  return out;
+    var outm = out.m;
+    // Perform rotation-specific matrix multiplication
+    outm[0] = x * x * t + c;
+    outm[1] = y * x * t + z * s;
+    outm[2] = z * x * t - y * s;
+    outm[3] = 0;
+    outm[4] = x * y * t - z * s;
+    outm[5] = y * y * t + c;
+    outm[6] = z * y * t + x * s;
+    outm[7] = 0;
+    outm[8] = x * z * t + y * s;
+    outm[9] = y * z * t - x * s;
+    outm[10] = z * z * t + c;
+    outm[11] = 0;
+    outm[12] = 0;
+    outm[13] = 0;
+    outm[14] = 0;
+    outm[15] = 1;
+    return out;
 };
 
 /**
@@ -7872,27 +8287,28 @@ mat4.fromRotation = function (out, rad, axis) {
  * @returns {mat4} out
  */
 mat4.fromXRotation = function (out, rad) {
-  var s = Math.sin(rad),
-      c = Math.cos(rad);
+    var s = Math.sin(rad),
+        c = Math.cos(rad);
 
-  // Perform axis-specific matrix multiplication
-  out.m00 = 1;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 0;
-  out.m04 = 0;
-  out.m05 = c;
-  out.m06 = s;
-  out.m07 = 0;
-  out.m08 = 0;
-  out.m09 = -s;
-  out.m10 = c;
-  out.m11 = 0;
-  out.m12 = 0;
-  out.m13 = 0;
-  out.m14 = 0;
-  out.m15 = 1;
-  return out;
+    // Perform axis-specific matrix multiplication
+    var outm = out.m;
+    outm[0] = 1;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 0;
+    outm[4] = 0;
+    outm[5] = c;
+    outm[6] = s;
+    outm[7] = 0;
+    outm[8] = 0;
+    outm[9] = -s;
+    outm[10] = c;
+    outm[11] = 0;
+    outm[12] = 0;
+    outm[13] = 0;
+    outm[14] = 0;
+    outm[15] = 1;
+    return out;
 };
 
 /**
@@ -7907,27 +8323,28 @@ mat4.fromXRotation = function (out, rad) {
  * @returns {mat4} out
  */
 mat4.fromYRotation = function (out, rad) {
-  var s = Math.sin(rad),
-      c = Math.cos(rad);
+    var s = Math.sin(rad),
+        c = Math.cos(rad);
 
-  // Perform axis-specific matrix multiplication
-  out.m00 = c;
-  out.m01 = 0;
-  out.m02 = -s;
-  out.m03 = 0;
-  out.m04 = 0;
-  out.m05 = 1;
-  out.m06 = 0;
-  out.m07 = 0;
-  out.m08 = s;
-  out.m09 = 0;
-  out.m10 = c;
-  out.m11 = 0;
-  out.m12 = 0;
-  out.m13 = 0;
-  out.m14 = 0;
-  out.m15 = 1;
-  return out;
+    // Perform axis-specific matrix multiplication
+    var outm = out.m;
+    outm[0] = c;
+    outm[1] = 0;
+    outm[2] = -s;
+    outm[3] = 0;
+    outm[4] = 0;
+    outm[5] = 1;
+    outm[6] = 0;
+    outm[7] = 0;
+    outm[8] = s;
+    outm[9] = 0;
+    outm[10] = c;
+    outm[11] = 0;
+    outm[12] = 0;
+    outm[13] = 0;
+    outm[14] = 0;
+    outm[15] = 1;
+    return out;
 };
 
 /**
@@ -7942,27 +8359,28 @@ mat4.fromYRotation = function (out, rad) {
  * @returns {mat4} out
  */
 mat4.fromZRotation = function (out, rad) {
-  var s = Math.sin(rad),
-      c = Math.cos(rad);
+    var s = Math.sin(rad),
+        c = Math.cos(rad);
 
-  // Perform axis-specific matrix multiplication
-  out.m00 = c;
-  out.m01 = s;
-  out.m02 = 0;
-  out.m03 = 0;
-  out.m04 = -s;
-  out.m05 = c;
-  out.m06 = 0;
-  out.m07 = 0;
-  out.m08 = 0;
-  out.m09 = 0;
-  out.m10 = 1;
-  out.m11 = 0;
-  out.m12 = 0;
-  out.m13 = 0;
-  out.m14 = 0;
-  out.m15 = 1;
-  return out;
+    // Perform axis-specific matrix multiplication
+    var outm = out.m;
+    outm[0] = c;
+    outm[1] = s;
+    outm[2] = 0;
+    outm[3] = 0;
+    outm[4] = -s;
+    outm[5] = c;
+    outm[6] = 0;
+    outm[7] = 0;
+    outm[8] = 0;
+    outm[9] = 0;
+    outm[10] = 1;
+    outm[11] = 0;
+    outm[12] = 0;
+    outm[13] = 0;
+    outm[14] = 0;
+    outm[15] = 1;
+    return out;
 };
 
 /**
@@ -7981,40 +8399,44 @@ mat4.fromZRotation = function (out, rad) {
  * @returns {mat4} out
  */
 mat4.fromRT = function (out, q, v) {
-  // Quaternion math
-  var x = q.x, y = q.y, z = q.z, w = q.w;
-  var x2 = x + x;
-  var y2 = y + y;
-  var z2 = z + z;
+    // Quaternion math
+    var x = q.x,
+        y = q.y,
+        z = q.z,
+        w = q.w;
+    var x2 = x + x;
+    var y2 = y + y;
+    var z2 = z + z;
 
-  var xx = x * x2;
-  var xy = x * y2;
-  var xz = x * z2;
-  var yy = y * y2;
-  var yz = y * z2;
-  var zz = z * z2;
-  var wx = w * x2;
-  var wy = w * y2;
-  var wz = w * z2;
+    var xx = x * x2;
+    var xy = x * y2;
+    var xz = x * z2;
+    var yy = y * y2;
+    var yz = y * z2;
+    var zz = z * z2;
+    var wx = w * x2;
+    var wy = w * y2;
+    var wz = w * z2;
 
-  out.m00 = 1 - (yy + zz);
-  out.m01 = xy + wz;
-  out.m02 = xz - wy;
-  out.m03 = 0;
-  out.m04 = xy - wz;
-  out.m05 = 1 - (xx + zz);
-  out.m06 = yz + wx;
-  out.m07 = 0;
-  out.m08 = xz + wy;
-  out.m09 = yz - wx;
-  out.m10 = 1 - (xx + yy);
-  out.m11 = 0;
-  out.m12 = v.x;
-  out.m13 = v.y;
-  out.m14 = v.z;
-  out.m15 = 1;
+    var outm = out.m;
+    outm[0] = 1 - (yy + zz);
+    outm[1] = xy + wz;
+    outm[2] = xz - wy;
+    outm[3] = 0;
+    outm[4] = xy - wz;
+    outm[5] = 1 - (xx + zz);
+    outm[6] = yz + wx;
+    outm[7] = 0;
+    outm[8] = xz + wy;
+    outm[9] = yz - wx;
+    outm[10] = 1 - (xx + yy);
+    outm[11] = 0;
+    outm[12] = v.x;
+    outm[13] = v.y;
+    outm[14] = v.z;
+    outm[15] = 1;
 
-  return out;
+    return out;
 };
 
 /**
@@ -8027,11 +8449,12 @@ mat4.fromRT = function (out, q, v) {
  * @return {vec3} out
  */
 mat4.getTranslation = function (out, mat) {
-  out.x = mat.m12;
-  out.y = mat.m13;
-  out.z = mat.m14;
+    var matm = mat.m;
+    out.x = matm[12];
+    out.y = matm[13];
+    out.z = matm[14];
 
-  return out;
+    return out;
 };
 
 /**
@@ -8045,21 +8468,22 @@ mat4.getTranslation = function (out, mat) {
  * @return {vec3} out
  */
 mat4.getScaling = function (out, mat) {
-  var m11 = mat.m00,
-      m12 = mat.m01,
-      m13 = mat.m02,
-      m21 = mat.m04,
-      m22 = mat.m05,
-      m23 = mat.m06,
-      m31 = mat.m08,
-      m32 = mat.m09,
-      m33 = mat.m10;
+    var matm = mat.m;
+    var m11 = matm[0],
+        m12 = matm[1],
+        m13 = matm[2],
+        m21 = matm[4],
+        m22 = matm[5],
+        m23 = matm[6],
+        m31 = matm[8],
+        m32 = matm[9],
+        m33 = matm[10];
 
-  out.x = Math.sqrt(m11 * m11 + m12 * m12 + m13 * m13);
-  out.y = Math.sqrt(m21 * m21 + m22 * m22 + m23 * m23);
-  out.z = Math.sqrt(m31 * m31 + m32 * m32 + m33 * m33);
+    out.x = Math.sqrt(m11 * m11 + m12 * m12 + m13 * m13);
+    out.y = Math.sqrt(m21 * m21 + m22 * m22 + m23 * m23);
+    out.z = Math.sqrt(m31 * m31 + m32 * m32 + m33 * m33);
 
-  return out;
+    return out;
 };
 
 /**
@@ -8072,37 +8496,38 @@ mat4.getScaling = function (out, mat) {
  * @return {quat} out
  */
 mat4.getRotation = function (out, mat) {
-  // Algorithm taken from http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.htm
-  var trace = mat.m00 + mat.m05 + mat.m10;
-  var S = 0;
+    // Algorithm taken from http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.htm
+    var matm = mat.m;
+    var trace = matm[0] + matm[5] + matm[10];
+    var S = 0;
 
-  if (trace > 0) {
-    S = Math.sqrt(trace + 1.0) * 2;
-    out.w = 0.25 * S;
-    out.x = (mat.m06 - mat.m09) / S;
-    out.y = (mat.m08 - mat.m02) / S;
-    out.z = (mat.m01 - mat.m04) / S;
-  } else if ((mat.m00 > mat.m05) & (mat.m00 > mat.m10)) {
-    S = Math.sqrt(1.0 + mat.m00 - mat.m05 - mat.m10) * 2;
-    out.w = (mat.m06 - mat.m09) / S;
-    out.x = 0.25 * S;
-    out.y = (mat.m01 + mat.m04) / S;
-    out.z = (mat.m08 + mat.m02) / S;
-  } else if (mat.m05 > mat.m10) {
-    S = Math.sqrt(1.0 + mat.m05 - mat.m00 - mat.m10) * 2;
-    out.w = (mat.m08 - mat.m02) / S;
-    out.x = (mat.m01 + mat.m04) / S;
-    out.y = 0.25 * S;
-    out.z = (mat.m06 + mat.m09) / S;
-  } else {
-    S = Math.sqrt(1.0 + mat.m10 - mat.m00 - mat.m05) * 2;
-    out.w = (mat.m01 - mat.m04) / S;
-    out.x = (mat.m08 + mat.m02) / S;
-    out.y = (mat.m06 + mat.m09) / S;
-    out.z = 0.25 * S;
-  }
+    if (trace > 0) {
+        S = Math.sqrt(trace + 1.0) * 2;
+        out.w = 0.25 * S;
+        out.x = (matm[6] - matm[9]) / S;
+        out.y = (matm[8] - matm[2]) / S;
+        out.z = (matm[1] - matm[4]) / S;
+    } else if ((matm[0] > matm[5]) & (matm[0] > matm[10])) {
+        S = Math.sqrt(1.0 + matm[0] - matm[5] - matm[10]) * 2;
+        out.w = (matm[6] - matm[9]) / S;
+        out.x = 0.25 * S;
+        out.y = (matm[1] + matm[4]) / S;
+        out.z = (matm[8] + matm[2]) / S;
+    } else if (matm[5] > matm[10]) {
+        S = Math.sqrt(1.0 + matm[5] - matm[0] - matm[10]) * 2;
+        out.w = (matm[8] - matm[2]) / S;
+        out.x = (matm[1] + matm[4]) / S;
+        out.y = 0.25 * S;
+        out.z = (matm[6] + matm[9]) / S;
+    } else {
+        S = Math.sqrt(1.0 + matm[10] - matm[0] - matm[5]) * 2;
+        out.w = (matm[1] - matm[4]) / S;
+        out.x = (matm[8] + matm[2]) / S;
+        out.y = (matm[6] + matm[9]) / S;
+        out.z = 0.25 * S;
+    }
 
-  return out;
+    return out;
 };
 
 /**
@@ -8123,43 +8548,47 @@ mat4.getRotation = function (out, mat) {
  * @returns {mat4} out
  */
 mat4.fromRTS = function (out, q, v, s) {
-  // Quaternion math
-  var x = q.x, y = q.y, z = q.z, w = q.w;
-  var x2 = x + x;
-  var y2 = y + y;
-  var z2 = z + z;
+    // Quaternion math
+    var x = q.x,
+        y = q.y,
+        z = q.z,
+        w = q.w;
+    var x2 = x + x;
+    var y2 = y + y;
+    var z2 = z + z;
 
-  var xx = x * x2;
-  var xy = x * y2;
-  var xz = x * z2;
-  var yy = y * y2;
-  var yz = y * z2;
-  var zz = z * z2;
-  var wx = w * x2;
-  var wy = w * y2;
-  var wz = w * z2;
-  var sx = s.x;
-  var sy = s.y;
-  var sz = s.z;
+    var xx = x * x2;
+    var xy = x * y2;
+    var xz = x * z2;
+    var yy = y * y2;
+    var yz = y * z2;
+    var zz = z * z2;
+    var wx = w * x2;
+    var wy = w * y2;
+    var wz = w * z2;
+    var sx = s.x;
+    var sy = s.y;
+    var sz = s.z;
 
-  out.m00 = (1 - (yy + zz)) * sx;
-  out.m01 = (xy + wz) * sx;
-  out.m02 = (xz - wy) * sx;
-  out.m03 = 0;
-  out.m04 = (xy - wz) * sy;
-  out.m05 = (1 - (xx + zz)) * sy;
-  out.m06 = (yz + wx) * sy;
-  out.m07 = 0;
-  out.m08 = (xz + wy) * sz;
-  out.m09 = (yz - wx) * sz;
-  out.m10 = (1 - (xx + yy)) * sz;
-  out.m11 = 0;
-  out.m12 = v.x;
-  out.m13 = v.y;
-  out.m14 = v.z;
-  out.m15 = 1;
+    var outm = out.m;
+    outm[0] = (1 - (yy + zz)) * sx;
+    outm[1] = (xy + wz) * sx;
+    outm[2] = (xz - wy) * sx;
+    outm[3] = 0;
+    outm[4] = (xy - wz) * sy;
+    outm[5] = (1 - (xx + zz)) * sy;
+    outm[6] = (yz + wx) * sy;
+    outm[7] = 0;
+    outm[8] = (xz + wy) * sz;
+    outm[9] = (yz - wx) * sz;
+    outm[10] = (1 - (xx + yy)) * sz;
+    outm[11] = 0;
+    outm[12] = v.x;
+    outm[13] = v.y;
+    outm[14] = v.z;
+    outm[15] = 1;
 
-  return out;
+    return out;
 };
 
 /**
@@ -8183,48 +8612,52 @@ mat4.fromRTS = function (out, q, v, s) {
  * @returns {mat4} out
  */
 mat4.fromRTSOrigin = function (out, q, v, s, o) {
-  // Quaternion math
-  var x = q.x, y = q.y, z = q.z, w = q.w;
-  var x2 = x + x;
-  var y2 = y + y;
-  var z2 = z + z;
+    // Quaternion math
+    var x = q.x,
+        y = q.y,
+        z = q.z,
+        w = q.w;
+    var x2 = x + x;
+    var y2 = y + y;
+    var z2 = z + z;
 
-  var xx = x * x2;
-  var xy = x * y2;
-  var xz = x * z2;
-  var yy = y * y2;
-  var yz = y * z2;
-  var zz = z * z2;
-  var wx = w * x2;
-  var wy = w * y2;
-  var wz = w * z2;
+    var xx = x * x2;
+    var xy = x * y2;
+    var xz = x * z2;
+    var yy = y * y2;
+    var yz = y * z2;
+    var zz = z * z2;
+    var wx = w * x2;
+    var wy = w * y2;
+    var wz = w * z2;
 
-  var sx = s.x;
-  var sy = s.y;
-  var sz = s.z;
+    var sx = s.x;
+    var sy = s.y;
+    var sz = s.z;
 
-  var ox = o.x;
-  var oy = o.y;
-  var oz = o.z;
+    var ox = o.x;
+    var oy = o.y;
+    var oz = o.z;
 
-  out.m00 = (1 - (yy + zz)) * sx;
-  out.m01 = (xy + wz) * sx;
-  out.m02 = (xz - wy) * sx;
-  out.m03 = 0;
-  out.m04 = (xy - wz) * sy;
-  out.m05 = (1 - (xx + zz)) * sy;
-  out.m06 = (yz + wx) * sy;
-  out.m07 = 0;
-  out.m08 = (xz + wy) * sz;
-  out.m09 = (yz - wx) * sz;
-  out.m10 = (1 - (xx + yy)) * sz;
-  out.m11 = 0;
-  out.m12 = v.x + ox - (out.m00 * ox + out.m04 * oy + out.m08 * oz);
-  out.m13 = v.y + oy - (out.m01 * ox + out.m05 * oy + out.m09 * oz);
-  out.m14 = v.z + oz - (out.m02 * ox + out.m06 * oy + out.m10 * oz);
-  out.m15 = 1;
+    var outm = out.m;
+    outm[0] = (1 - (yy + zz)) * sx;
+    outm[1] = (xy + wz) * sx;
+    outm[2] = (xz - wy) * sx;
+    outm[3] = 0;
+    outm[4] = (xy - wz) * sy;
+    outm[5] = (1 - (xx + zz)) * sy;
+    outm[6] = (yz + wx) * sy;
+    outm[7] = 0;
+    outm[8] = (xz + wy) * sz;
+    outm[9] = (yz - wx) * sz;
+    outm[10] = (1 - (xx + yy)) * sz;
+    outm[11] = 0;
+    outm[12] = v.x + ox - (outm[0] * ox + outm[4] * oy + outm[8] * oz);
+    outm[13] = v.y + oy - (outm[1] * ox + outm[5] * oy + outm[9] * oz);
+    outm[14] = v.z + oz - (outm[2] * ox + outm[6] * oy + outm[10] * oz);
+    outm[15] = 1;
 
-  return out;
+    return out;
 };
 
 /**
@@ -8236,42 +8669,44 @@ mat4.fromRTSOrigin = function (out, q, v, s, o) {
  * @returns {mat4} out
  */
 mat4.fromQuat = function (out, q) {
-  var x = q.x, y = q.y, z = q.z, w = q.w;
-  var x2 = x + x;
-  var y2 = y + y;
-  var z2 = z + z;
+    var x = q.x,
+        y = q.y,
+        z = q.z,
+        w = q.w;
+    var x2 = x + x;
+    var y2 = y + y;
+    var z2 = z + z;
 
-  var xx = x * x2;
-  var yx = y * x2;
-  var yy = y * y2;
-  var zx = z * x2;
-  var zy = z * y2;
-  var zz = z * z2;
-  var wx = w * x2;
-  var wy = w * y2;
-  var wz = w * z2;
+    var xx = x * x2;
+    var yx = y * x2;
+    var yy = y * y2;
+    var zx = z * x2;
+    var zy = z * y2;
+    var zz = z * z2;
+    var wx = w * x2;
+    var wy = w * y2;
+    var wz = w * z2;
 
-  out.m00 = 1 - yy - zz;
-  out.m01 = yx + wz;
-  out.m02 = zx - wy;
-  out.m03 = 0;
+    var outm = out.m;
 
-  out.m04 = yx - wz;
-  out.m05 = 1 - xx - zz;
-  out.m06 = zy + wx;
-  out.m07 = 0;
+    outm[0] = 1 - yy - zz;
+    outm[1] = yx + wz;
+    outm[2] = zx - wy;
+    outm[3] = 0;
+    outm[4] = yx - wz;
+    outm[5] = 1 - xx - zz;
+    outm[6] = zy + wx;
+    outm[7] = 0;
+    outm[8] = zx + wy;
+    outm[9] = zy - wx;
+    outm[10] = 1 - xx - yy;
+    outm[11] = 0;
+    outm[12] = 0;
+    outm[13] = 0;
+    outm[14] = 0;
+    outm[15] = 1;
 
-  out.m08 = zx + wy;
-  out.m09 = zy - wx;
-  out.m10 = 1 - xx - yy;
-  out.m11 = 0;
-
-  out.m12 = 0;
-  out.m13 = 0;
-  out.m14 = 0;
-  out.m15 = 1;
-
-  return out;
+    return out;
 };
 
 /**
@@ -8287,27 +8722,28 @@ mat4.fromQuat = function (out, q) {
  * @returns {mat4} out
  */
 mat4.frustum = function (out, left, right, bottom, top, near, far) {
-  var rl = 1 / (right - left);
-  var tb = 1 / (top - bottom);
-  var nf = 1 / (near - far);
+    var rl = 1 / (right - left);
+    var tb = 1 / (top - bottom);
+    var nf = 1 / (near - far);
 
-  out.m00 = (near * 2) * rl;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 0;
-  out.m04 = 0;
-  out.m05 = (near * 2) * tb;
-  out.m06 = 0;
-  out.m07 = 0;
-  out.m08 = (right + left) * rl;
-  out.m09 = (top + bottom) * tb;
-  out.m10 = (far + near) * nf;
-  out.m11 = -1;
-  out.m12 = 0;
-  out.m13 = 0;
-  out.m14 = (far * near * 2) * nf;
-  out.m15 = 0;
-  return out;
+    var outm = out.m;
+    outm[0] = (near * 2) * rl;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 0;
+    outm[4] = 0;
+    outm[5] = (near * 2) * tb;
+    outm[6] = 0;
+    outm[7] = 0;
+    outm[8] = (right + left) * rl;
+    outm[9] = (top + bottom) * tb;
+    outm[10] = (far + near) * nf;
+    outm[11] = -1;
+    outm[12] = 0;
+    outm[13] = 0;
+    outm[14] = (far * near * 2) * nf;
+    outm[15] = 0;
+    return out;
 };
 
 /**
@@ -8321,26 +8757,27 @@ mat4.frustum = function (out, left, right, bottom, top, near, far) {
  * @returns {mat4} out
  */
 mat4.perspective = function (out, fovy, aspect, near, far) {
-  var f = 1.0 / Math.tan(fovy / 2);
-  var nf = 1 / (near - far);
+    var f = 1.0 / Math.tan(fovy / 2);
+    var nf = 1 / (near - far);
 
-  out.m00 = f / aspect;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 0;
-  out.m04 = 0;
-  out.m05 = f;
-  out.m06 = 0;
-  out.m07 = 0;
-  out.m08 = 0;
-  out.m09 = 0;
-  out.m10 = (far + near) * nf;
-  out.m11 = -1;
-  out.m12 = 0;
-  out.m13 = 0;
-  out.m14 = (2 * far * near) * nf;
-  out.m15 = 0;
-  return out;
+    var outm = out.m;
+    outm[0] = f / aspect;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 0;
+    outm[4] = 0;
+    outm[5] = f;
+    outm[6] = 0;
+    outm[7] = 0;
+    outm[8] = 0;
+    outm[9] = 0;
+    outm[10] = (far + near) * nf;
+    outm[11] = -1;
+    outm[12] = 0;
+    outm[13] = 0;
+    outm[14] = (2 * far * near) * nf;
+    outm[15] = 0;
+    return out;
 };
 
 /**
@@ -8355,30 +8792,31 @@ mat4.perspective = function (out, fovy, aspect, near, far) {
  * @returns {mat4} out
  */
 mat4.perspectiveFromFieldOfView = function (out, fov, near, far) {
-  var upTan = Math.tan(fov.upDegrees * Math.PI / 180.0);
-  var downTan = Math.tan(fov.downDegrees * Math.PI / 180.0);
-  var leftTan = Math.tan(fov.leftDegrees * Math.PI / 180.0);
-  var rightTan = Math.tan(fov.rightDegrees * Math.PI / 180.0);
-  var xScale = 2.0 / (leftTan + rightTan);
-  var yScale = 2.0 / (upTan + downTan);
+    var upTan = Math.tan(fov.upDegrees * Math.PI / 180.0);
+    var downTan = Math.tan(fov.downDegrees * Math.PI / 180.0);
+    var leftTan = Math.tan(fov.leftDegrees * Math.PI / 180.0);
+    var rightTan = Math.tan(fov.rightDegrees * Math.PI / 180.0);
+    var xScale = 2.0 / (leftTan + rightTan);
+    var yScale = 2.0 / (upTan + downTan);
 
-  out.m00 = xScale;
-  out.m01 = 0.0;
-  out.m02 = 0.0;
-  out.m03 = 0.0;
-  out.m04 = 0.0;
-  out.m05 = yScale;
-  out.m06 = 0.0;
-  out.m07 = 0.0;
-  out.m08 = -((leftTan - rightTan) * xScale * 0.5);
-  out.m09 = ((upTan - downTan) * yScale * 0.5);
-  out.m10 = far / (near - far);
-  out.m11 = -1.0;
-  out.m12 = 0.0;
-  out.m13 = 0.0;
-  out.m14 = (far * near) / (near - far);
-  out.m15 = 0.0;
-  return out;
+    var outm = out.m;
+    outm[0] = xScale;
+    outm[1] = 0.0;
+    outm[2] = 0.0;
+    outm[3] = 0.0;
+    outm[4] = 0.0;
+    outm[5] = yScale;
+    outm[6] = 0.0;
+    outm[7] = 0.0;
+    outm[8] = -((leftTan - rightTan) * xScale * 0.5);
+    outm[9] = ((upTan - downTan) * yScale * 0.5);
+    outm[10] = far / (near - far);
+    outm[11] = -1.0;
+    outm[12] = 0.0;
+    outm[13] = 0.0;
+    outm[14] = (far * near) / (near - far);
+    outm[15] = 0.0;
+    return out;
 };
 
 /**
@@ -8394,26 +8832,28 @@ mat4.perspectiveFromFieldOfView = function (out, fov, near, far) {
  * @returns {mat4} out
  */
 mat4.ortho = function (out, left, right, bottom, top, near, far) {
-  var lr = 1 / (left - right);
-  var bt = 1 / (bottom - top);
-  var nf = 1 / (near - far);
-  out.m00 = -2 * lr;
-  out.m01 = 0;
-  out.m02 = 0;
-  out.m03 = 0;
-  out.m04 = 0;
-  out.m05 = -2 * bt;
-  out.m06 = 0;
-  out.m07 = 0;
-  out.m08 = 0;
-  out.m09 = 0;
-  out.m10 = 2 * nf;
-  out.m11 = 0;
-  out.m12 = (left + right) * lr;
-  out.m13 = (top + bottom) * bt;
-  out.m14 = (far + near) * nf;
-  out.m15 = 1;
-  return out;
+    var lr = 1 / (left - right);
+    var bt = 1 / (bottom - top);
+    var nf = 1 / (near - far);
+
+    var outm = out.m;
+    outm[0] = -2 * lr;
+    outm[1] = 0;
+    outm[2] = 0;
+    outm[3] = 0;
+    outm[4] = 0;
+    outm[5] = -2 * bt;
+    outm[6] = 0;
+    outm[7] = 0;
+    outm[8] = 0;
+    outm[9] = 0;
+    outm[10] = 2 * nf;
+    outm[11] = 0;
+    outm[12] = (left + right) * lr;
+    outm[13] = (top + bottom) * bt;
+    outm[14] = (far + near) * nf;
+    outm[15] = 1;
+    return out;
 };
 
 /**
@@ -8426,83 +8866,84 @@ mat4.ortho = function (out, left, right, bottom, top, near, far) {
  * @returns {mat4} out
  */
 mat4.lookAt = function (out, eye, center, up) {
-  var x0, x1, x2, y0, y1, y2, z0, z1, z2, len;
-  var eyex = eye.x;
-  var eyey = eye.y;
-  var eyez = eye.z;
-  var upx = up.x;
-  var upy = up.y;
-  var upz = up.z;
-  var centerx = center.x;
-  var centery = center.y;
-  var centerz = center.z;
+    var x0, x1, x2, y0, y1, y2, z0, z1, z2, len;
+    var eyex = eye.x;
+    var eyey = eye.y;
+    var eyez = eye.z;
+    var upx = up.x;
+    var upy = up.y;
+    var upz = up.z;
+    var centerx = center.x;
+    var centery = center.y;
+    var centerz = center.z;
 
-  if (
-    Math.abs(eyex - centerx) < EPSILON &&
-    Math.abs(eyey - centery) < EPSILON &&
-    Math.abs(eyez - centerz) < EPSILON
-  ) {
-    return mat4.identity(out);
-  }
+    if (
+        Math.abs(eyex - centerx) < EPSILON &&
+        Math.abs(eyey - centery) < EPSILON &&
+        Math.abs(eyez - centerz) < EPSILON
+    ) {
+        return mat4.identity(out);
+    }
 
-  z0 = eyex - centerx;
-  z1 = eyey - centery;
-  z2 = eyez - centerz;
+    z0 = eyex - centerx;
+    z1 = eyey - centery;
+    z2 = eyez - centerz;
 
-  len = 1 / Math.sqrt(z0 * z0 + z1 * z1 + z2 * z2);
-  z0 *= len;
-  z1 *= len;
-  z2 *= len;
+    len = 1 / Math.sqrt(z0 * z0 + z1 * z1 + z2 * z2);
+    z0 *= len;
+    z1 *= len;
+    z2 *= len;
 
-  x0 = upy * z2 - upz * z1;
-  x1 = upz * z0 - upx * z2;
-  x2 = upx * z1 - upy * z0;
-  len = Math.sqrt(x0 * x0 + x1 * x1 + x2 * x2);
-  if (!len) {
-    x0 = 0;
-    x1 = 0;
-    x2 = 0;
-  } else {
-    len = 1 / len;
-    x0 *= len;
-    x1 *= len;
-    x2 *= len;
-  }
+    x0 = upy * z2 - upz * z1;
+    x1 = upz * z0 - upx * z2;
+    x2 = upx * z1 - upy * z0;
+    len = Math.sqrt(x0 * x0 + x1 * x1 + x2 * x2);
+    if (!len) {
+        x0 = 0;
+        x1 = 0;
+        x2 = 0;
+    } else {
+        len = 1 / len;
+        x0 *= len;
+        x1 *= len;
+        x2 *= len;
+    }
 
-  y0 = z1 * x2 - z2 * x1;
-  y1 = z2 * x0 - z0 * x2;
-  y2 = z0 * x1 - z1 * x0;
+    y0 = z1 * x2 - z2 * x1;
+    y1 = z2 * x0 - z0 * x2;
+    y2 = z0 * x1 - z1 * x0;
 
-  len = Math.sqrt(y0 * y0 + y1 * y1 + y2 * y2);
-  if (!len) {
-    y0 = 0;
-    y1 = 0;
-    y2 = 0;
-  } else {
-    len = 1 / len;
-    y0 *= len;
-    y1 *= len;
-    y2 *= len;
-  }
+    len = Math.sqrt(y0 * y0 + y1 * y1 + y2 * y2);
+    if (!len) {
+        y0 = 0;
+        y1 = 0;
+        y2 = 0;
+    } else {
+        len = 1 / len;
+        y0 *= len;
+        y1 *= len;
+        y2 *= len;
+    }
 
-  out.m00 = x0;
-  out.m01 = y0;
-  out.m02 = z0;
-  out.m03 = 0;
-  out.m04 = x1;
-  out.m05 = y1;
-  out.m06 = z1;
-  out.m07 = 0;
-  out.m08 = x2;
-  out.m09 = y2;
-  out.m10 = z2;
-  out.m11 = 0;
-  out.m12 = -(x0 * eyex + x1 * eyey + x2 * eyez);
-  out.m13 = -(y0 * eyex + y1 * eyey + y2 * eyez);
-  out.m14 = -(z0 * eyex + z1 * eyey + z2 * eyez);
-  out.m15 = 1;
+    var outm = out.m;
+    outm[0] = x0;
+    outm[1] = y0;
+    outm[2] = z0;
+    outm[3] = 0;
+    outm[4] = x1;
+    outm[5] = y1;
+    outm[6] = z1;
+    outm[7] = 0;
+    outm[8] = x2;
+    outm[9] = y2;
+    outm[10] = z2;
+    outm[11] = 0;
+    outm[12] = -(x0 * eyex + x1 * eyey + x2 * eyez);
+    outm[13] = -(y0 * eyex + y1 * eyey + y2 * eyez);
+    outm[14] = -(z0 * eyex + z1 * eyey + z2 * eyez);
+    outm[15] = 1;
 
-  return out;
+    return out;
 };
 
 /**
@@ -8512,7 +8953,8 @@ mat4.lookAt = function (out, eye, center, up) {
  * @returns {String} string representation of the matrix
  */
 mat4.str = function (a) {
-  return ("mat4(" + (a.m00) + ", " + (a.m01) + ", " + (a.m02) + ", " + (a.m03) + ", " + (a.m04) + ", " + (a.m05) + ", " + (a.m06) + ", " + (a.m07) + ", " + (a.m08) + ", " + (a.m09) + ", " + (a.m10) + ", " + (a.m11) + ", " + (a.m12) + ", " + (a.m13) + ", " + (a.m14) + ", " + (a.m15) + ")");
+    var am = a.m;
+    return ("mat4(" + (am[0]) + ", " + (am[1]) + ", " + (am[2]) + ", " + (am[3]) + ", " + (am[4]) + ", " + (am[5]) + ", " + (am[6]) + ", " + (am[7]) + ", " + (am[8]) + ", " + (am[9]) + ", " + (am[10]) + ", " + (am[11]) + ", " + (am[12]) + ", " + (am[13]) + ", " + (am[14]) + ", " + (am[15]) + ")");
 };
 
 /**
@@ -8523,24 +8965,8 @@ mat4.str = function (a) {
  * @returns {array}
  */
 mat4.array = function (out, m) {
-  out[0]  = m.m00;
-  out[1]  = m.m01;
-  out[2]  = m.m02;
-  out[3]  = m.m03;
-  out[4]  = m.m04;
-  out[5]  = m.m05;
-  out[6]  = m.m06;
-  out[7]  = m.m07;
-  out[8]  = m.m08;
-  out[9]  = m.m09;
-  out[10] = m.m10;
-  out[11] = m.m11;
-  out[12] = m.m12;
-  out[13] = m.m13;
-  out[14] = m.m14;
-  out[15] = m.m15;
-
-  return out;
+    out.m.set(m.m)
+    return out;
 };
 
 /**
@@ -8550,7 +8976,8 @@ mat4.array = function (out, m) {
  * @returns {Number} Frobenius norm
  */
 mat4.frob = function (a) {
-  return (Math.sqrt(Math.pow(a.m00, 2) + Math.pow(a.m01, 2) + Math.pow(a.m02, 2) + Math.pow(a.m03, 2) + Math.pow(a.m04, 2) + Math.pow(a.m05, 2) + Math.pow(a.m06, 2) + Math.pow(a.m07, 2) + Math.pow(a.m08, 2) + Math.pow(a.m09, 2) + Math.pow(a.m10, 2) + Math.pow(a.m11, 2) + Math.pow(a.m12, 2) + Math.pow(a.m13, 2) + Math.pow(a.m14, 2) + Math.pow(a.m15, 2)))
+    var am = a.m;
+    return (Math.sqrt(Math.pow(am[0], 2) + Math.pow(am[1], 2) + Math.pow(am[2], 2) + Math.pow(am[3], 2) + Math.pow(am[4], 2) + Math.pow(am[5], 2) + Math.pow(am[6], 2) + Math.pow(am[7], 2) + Math.pow(am[8], 2) + Math.pow(am[9], 2) + Math.pow(am[10], 2) + Math.pow(am[11], 2) + Math.pow(am[12], 2) + Math.pow(am[13], 2) + Math.pow(am[14], 2) + Math.pow(am[15], 2)))
 };
 
 /**
@@ -8562,23 +8989,27 @@ mat4.frob = function (a) {
  * @returns {mat4} out
  */
 mat4.add = function (out, a, b) {
-  out.m00 = a.m00 + b.m00;
-  out.m01 = a.m01 + b.m01;
-  out.m02 = a.m02 + b.m02;
-  out.m03 = a.m03 + b.m03;
-  out.m04 = a.m04 + b.m04;
-  out.m05 = a.m05 + b.m05;
-  out.m06 = a.m06 + b.m06;
-  out.m07 = a.m07 + b.m07;
-  out.m08 = a.m08 + b.m08;
-  out.m09 = a.m09 + b.m09;
-  out.m10 = a.m10 + b.m10;
-  out.m11 = a.m11 + b.m11;
-  out.m12 = a.m12 + b.m12;
-  out.m13 = a.m13 + b.m13;
-  out.m14 = a.m14 + b.m14;
-  out.m15 = a.m15 + b.m15;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    var bm = b.m;
+
+    outm[0] = am[0] + bm[0];
+    outm[1] = am[1] + bm[1];
+    outm[2] = am[2] + bm[2];
+    outm[3] = am[3] + bm[3];
+    outm[4] = am[4] + bm[4];
+    outm[5] = am[5] + bm[5];
+    outm[6] = am[6] + bm[6];
+    outm[7] = am[7] + bm[7];
+    outm[8] = am[8] + bm[8];
+    outm[9] = am[9] + bm[9];
+    outm[10] = am[10] + bm[10];
+    outm[11] = am[11] + bm[11];
+    outm[12] = am[12] + bm[12];
+    outm[13] = am[13] + bm[13];
+    outm[14] = am[14] + bm[14];
+    outm[15] = am[15] + bm[15];
+    return out;
 };
 
 /**
@@ -8590,23 +9021,27 @@ mat4.add = function (out, a, b) {
  * @returns {mat4} out
  */
 mat4.subtract = function (out, a, b) {
-  out.m00 = a.m00 - b.m00;
-  out.m01 = a.m01 - b.m01;
-  out.m02 = a.m02 - b.m02;
-  out.m03 = a.m03 - b.m03;
-  out.m04 = a.m04 - b.m04;
-  out.m05 = a.m05 - b.m05;
-  out.m06 = a.m06 - b.m06;
-  out.m07 = a.m07 - b.m07;
-  out.m08 = a.m08 - b.m08;
-  out.m09 = a.m09 - b.m09;
-  out.m10 = a.m10 - b.m10;
-  out.m11 = a.m11 - b.m11;
-  out.m12 = a.m12 - b.m12;
-  out.m13 = a.m13 - b.m13;
-  out.m14 = a.m14 - b.m14;
-  out.m15 = a.m15 - b.m15;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    var bm = b.m;
+
+    outm[0] = am[0] - bm[0];
+    outm[1] = am[1] - bm[1];
+    outm[2] = am[2] - bm[2];
+    outm[3] = am[3] - bm[3];
+    outm[4] = am[4] - bm[4];
+    outm[5] = am[5] - bm[5];
+    outm[6] = am[6] - bm[6];
+    outm[7] = am[7] - bm[7];
+    outm[8] = am[8] - bm[8];
+    outm[9] = am[9] - bm[9];
+    outm[10] = am[10] - bm[10];
+    outm[11] = am[11] - bm[11];
+    outm[12] = am[12] - bm[12];
+    outm[13] = am[13] - bm[13];
+    outm[14] = am[14] - bm[14];
+    outm[15] = am[15] - bm[15];
+    return out;
 };
 
 /**
@@ -8624,23 +9059,26 @@ mat4.sub = mat4.subtract;
  * @returns {mat4} out
  */
 mat4.multiplyScalar = function (out, a, b) {
-  out.m00 = a.m00 * b;
-  out.m01 = a.m01 * b;
-  out.m02 = a.m02 * b;
-  out.m03 = a.m03 * b;
-  out.m04 = a.m04 * b;
-  out.m05 = a.m05 * b;
-  out.m06 = a.m06 * b;
-  out.m07 = a.m07 * b;
-  out.m08 = a.m08 * b;
-  out.m09 = a.m09 * b;
-  out.m10 = a.m10 * b;
-  out.m11 = a.m11 * b;
-  out.m12 = a.m12 * b;
-  out.m13 = a.m13 * b;
-  out.m14 = a.m14 * b;
-  out.m15 = a.m15 * b;
-  return out;
+    var outm = out.m;
+    var am = a.m;
+
+    outm[0] = am[0] * b;
+    outm[1] = am[1] * b;
+    outm[2] = am[2] * b;
+    outm[3] = am[3] * b;
+    outm[4] = am[4] * b;
+    outm[5] = am[5] * b;
+    outm[6] = am[6] * b;
+    outm[7] = am[7] * b;
+    outm[8] = am[8] * b;
+    outm[9] = am[9] * b;
+    outm[10] = am[10] * b;
+    outm[11] = am[11] * b;
+    outm[12] = am[12] * b;
+    outm[13] = am[13] * b;
+    outm[14] = am[14] * b;
+    outm[15] = am[15] * b;
+    return out;
 };
 
 /**
@@ -8653,23 +9091,27 @@ mat4.multiplyScalar = function (out, a, b) {
  * @returns {mat4} out
  */
 mat4.multiplyScalarAndAdd = function (out, a, b, scale) {
-  out.m00 = a.m00 + (b.m00 * scale);
-  out.m01 = a.m01 + (b.m01 * scale);
-  out.m02 = a.m02 + (b.m02 * scale);
-  out.m03 = a.m03 + (b.m03 * scale);
-  out.m04 = a.m04 + (b.m04 * scale);
-  out.m05 = a.m05 + (b.m05 * scale);
-  out.m06 = a.m06 + (b.m06 * scale);
-  out.m07 = a.m07 + (b.m07 * scale);
-  out.m08 = a.m08 + (b.m08 * scale);
-  out.m09 = a.m09 + (b.m09 * scale);
-  out.m10 = a.m10 + (b.m10 * scale);
-  out.m11 = a.m11 + (b.m11 * scale);
-  out.m12 = a.m12 + (b.m12 * scale);
-  out.m13 = a.m13 + (b.m13 * scale);
-  out.m14 = a.m14 + (b.m14 * scale);
-  out.m15 = a.m15 + (b.m15 * scale);
-  return out;
+    var outm = out.m;
+    var am = a.m;
+    var bm = b.m;
+
+    outm[0] = am[0] + (bm[0] * scale);
+    outm[1] = am[1] + (bm[1] * scale);
+    outm[2] = am[2] + (bm[2] * scale);
+    outm[3] = am[3] + (bm[3] * scale);
+    outm[4] = am[4] + (bm[4] * scale);
+    outm[5] = am[5] + (bm[5] * scale);
+    outm[6] = am[6] + (bm[6] * scale);
+    outm[7] = am[7] + (bm[7] * scale);
+    outm[8] = am[8] + (bm[8] * scale);
+    outm[9] = am[9] + (bm[9] * scale);
+    outm[10] = am[10] + (bm[10] * scale);
+    outm[11] = am[11] + (bm[11] * scale);
+    outm[12] = am[12] + (bm[12] * scale);
+    outm[13] = am[13] + (bm[13] * scale);
+    outm[14] = am[14] + (bm[14] * scale);
+    outm[15] = am[15] + (bm[15] * scale);
+    return out;
 };
 
 /**
@@ -8680,10 +9122,12 @@ mat4.multiplyScalarAndAdd = function (out, a, b, scale) {
  * @returns {Boolean} True if the matrices are equal, false otherwise.
  */
 mat4.exactEquals = function (a, b) {
-  return a.m00 === b.m00 && a.m01 === b.m01 && a.m02 === b.m02 && a.m03 === b.m03 &&
-    a.m04 === b.m04 && a.m05 === b.m05 && a.m06 === b.m06 && a.m07 === b.m07 &&
-    a.m08 === b.m08 && a.m09 === b.m09 && a.m10 === b.m10 && a.m11 === b.m11 &&
-    a.m12 === b.m12 && a.m13 === b.m13 && a.m14 === b.m14 && a.m15 === b.m15;
+    var am = a.m;
+    var bm = b.m;
+    return am[0] === bm[0] && am[1] === bm[1] && am[2] === bm[2] && am[3] === bm[3] &&
+        am[4] === bm[4] && am[5] === bm[5] && am[6] === bm[6] && am[7] === bm[7] &&
+        am[8] === bm[8] && am[9] === bm[9] && am[10] === bm[10] && am[11] === bm[11] &&
+        am[12] === bm[12] && am[13] === bm[13] && am[14] === bm[14] && am[15] === bm[15];
 };
 
 /**
@@ -8694,34 +9138,61 @@ mat4.exactEquals = function (a, b) {
  * @returns {Boolean} True if the matrices are equal, false otherwise.
  */
 mat4.equals = function (a, b) {
-  var a0 = a.m00, a1 = a.m01, a2 = a.m02, a3 = a.m03,
-      a4 = a.m04, a5 = a.m05, a6 = a.m06, a7 = a.m07,
-      a8 = a.m08, a9 = a.m09, a10 = a.m10, a11 = a.m11,
-      a12 = a.m12, a13 = a.m13, a14 = a.m14, a15 = a.m15;
+    var am = a.m;
+    var bm = b.m;
 
-  var b0 = b.m00, b1 = b.m01, b2 = b.m02, b3 = b.m03,
-      b4 = b.m04, b5 = b.m05, b6 = b.m06, b7 = b.m07,
-      b8 = b.m08, b9 = b.m09, b10 = b.m10, b11 = b.m11,
-      b12 = b.m12, b13 = b.m13, b14 = b.m14, b15 = b.m15;
+    var a0 = am[0],
+        a1 = am[1],
+        a2 = am[2],
+        a3 = am[3],
+        a4 = am[4],
+        a5 = am[5],
+        a6 = am[6],
+        a7 = am[7],
+        a8 = am[8],
+        a9 = am[9],
+        a10 = am[10],
+        a11 = am[11],
+        a12 = am[12],
+        a13 = am[13],
+        a14 = am[14],
+        a15 = am[15];
 
-  return (
-    Math.abs(a0 - b0) <= EPSILON * Math.max(1.0, Math.abs(a0), Math.abs(b0)) &&
-    Math.abs(a1 - b1) <= EPSILON * Math.max(1.0, Math.abs(a1), Math.abs(b1)) &&
-    Math.abs(a2 - b2) <= EPSILON * Math.max(1.0, Math.abs(a2), Math.abs(b2)) &&
-    Math.abs(a3 - b3) <= EPSILON * Math.max(1.0, Math.abs(a3), Math.abs(b3)) &&
-    Math.abs(a4 - b4) <= EPSILON * Math.max(1.0, Math.abs(a4), Math.abs(b4)) &&
-    Math.abs(a5 - b5) <= EPSILON * Math.max(1.0, Math.abs(a5), Math.abs(b5)) &&
-    Math.abs(a6 - b6) <= EPSILON * Math.max(1.0, Math.abs(a6), Math.abs(b6)) &&
-    Math.abs(a7 - b7) <= EPSILON * Math.max(1.0, Math.abs(a7), Math.abs(b7)) &&
-    Math.abs(a8 - b8) <= EPSILON * Math.max(1.0, Math.abs(a8), Math.abs(b8)) &&
-    Math.abs(a9 - b9) <= EPSILON * Math.max(1.0, Math.abs(a9), Math.abs(b9)) &&
-    Math.abs(a10 - b10) <= EPSILON * Math.max(1.0, Math.abs(a10), Math.abs(b10)) &&
-    Math.abs(a11 - b11) <= EPSILON * Math.max(1.0, Math.abs(a11), Math.abs(b11)) &&
-    Math.abs(a12 - b12) <= EPSILON * Math.max(1.0, Math.abs(a12), Math.abs(b12)) &&
-    Math.abs(a13 - b13) <= EPSILON * Math.max(1.0, Math.abs(a13), Math.abs(b13)) &&
-    Math.abs(a14 - b14) <= EPSILON * Math.max(1.0, Math.abs(a14), Math.abs(b14)) &&
-    Math.abs(a15 - b15) <= EPSILON * Math.max(1.0, Math.abs(a15), Math.abs(b15))
-  );
+    var b0 = bm[0],
+        b1 = bm[1],
+        b2 = bm[2],
+        b3 = bm[3],
+        b4 = bm[4],
+        b5 = bm[5],
+        b6 = bm[6],
+        b7 = bm[7],
+        b8 = bm[8],
+        b9 = bm[9],
+        b10 = bm[10],
+        b11 = bm[11],
+        b12 = bm[12],
+        b13 = bm[13],
+        b14 = bm[14],
+        b15 = bm[15];
+
+    return (
+        Math.abs(a0 - b0) <= EPSILON * Math.max(1.0, Math.abs(a0), Math.abs(b0)) &&
+        Math.abs(a1 - b1) <= EPSILON * Math.max(1.0, Math.abs(a1), Math.abs(b1)) &&
+        Math.abs(a2 - b2) <= EPSILON * Math.max(1.0, Math.abs(a2), Math.abs(b2)) &&
+        Math.abs(a3 - b3) <= EPSILON * Math.max(1.0, Math.abs(a3), Math.abs(b3)) &&
+        Math.abs(a4 - b4) <= EPSILON * Math.max(1.0, Math.abs(a4), Math.abs(b4)) &&
+        Math.abs(a5 - b5) <= EPSILON * Math.max(1.0, Math.abs(a5), Math.abs(b5)) &&
+        Math.abs(a6 - b6) <= EPSILON * Math.max(1.0, Math.abs(a6), Math.abs(b6)) &&
+        Math.abs(a7 - b7) <= EPSILON * Math.max(1.0, Math.abs(a7), Math.abs(b7)) &&
+        Math.abs(a8 - b8) <= EPSILON * Math.max(1.0, Math.abs(a8), Math.abs(b8)) &&
+        Math.abs(a9 - b9) <= EPSILON * Math.max(1.0, Math.abs(a9), Math.abs(b9)) &&
+        Math.abs(a10 - b10) <= EPSILON * Math.max(1.0, Math.abs(a10), Math.abs(b10)) &&
+        Math.abs(a11 - b11) <= EPSILON * Math.max(1.0, Math.abs(a11), Math.abs(b11)) &&
+        Math.abs(a12 - b12) <= EPSILON * Math.max(1.0, Math.abs(a12), Math.abs(b12)) &&
+        Math.abs(a13 - b13) <= EPSILON * Math.max(1.0, Math.abs(a13), Math.abs(b13)) &&
+        Math.abs(a14 - b14) <= EPSILON * Math.max(1.0, Math.abs(a14), Math.abs(b14)) &&
+        Math.abs(a15 - b15) <= EPSILON * Math.max(1.0, Math.abs(a15), Math.abs(b15))
+    );
 };
 
 var _tmp$8 = new Array(3);

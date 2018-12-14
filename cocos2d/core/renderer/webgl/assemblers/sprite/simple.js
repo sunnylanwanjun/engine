@@ -53,9 +53,9 @@ module.exports = {
         let verts = sprite._renderData.vertices,
             node = sprite.node,
             color = node._color._val,
-            matrix = node._worldMatrix,
-            a = matrix.m00, b = matrix.m01, c = matrix.m04, d = matrix.m05,
-            tx = matrix.m12, ty = matrix.m13;
+            matrixm = node._worldMatrix.m,
+            a = matrixm[0], b = matrixm[1], c = matrixm[4], d = matrixm[5],
+            tx = matrixm[12], ty = matrixm[13];
     
         let buffer = renderer._meshBuffer,
             vertexOffset = buffer.byteOffset >> 2,

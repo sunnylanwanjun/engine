@@ -37,9 +37,9 @@ module.exports = js.addon({
             verts = renderData.vertices,
             color = node._color._val;
         
-        let matrix = node._worldMatrix,
-            a = matrix.m00, b = matrix.m01, c = matrix.m04, d = matrix.m05, 
-            tx = matrix.m12, ty = matrix.m13;
+        let matrixm = node._worldMatrix.m,
+            a = matrixm[0], b = matrixm[1], c = matrixm[4], d = matrixm[5], 
+            tx = matrixm[12], ty = matrixm[13];
     
         let buffer = renderer._quadBuffer,
             vertexOffset = buffer.byteOffset >> 2;

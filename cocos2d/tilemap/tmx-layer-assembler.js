@@ -117,8 +117,9 @@ let tmxAssembler = {
         vec3.set(_vec3_temp, -appx, -appy, 0);
         mat4.translate(_mat4_temp, _mat4_temp, _vec3_temp);
 
-        let a = _mat4_temp.m00, b = _mat4_temp.m01, c = _mat4_temp.m04, d = _mat4_temp.m05,
-            tx = _mat4_temp.m12, ty = _mat4_temp.m13;
+        let _mat4_tempm = _mat4_temp.m;
+        let a = _mat4_tempm[0], b = _mat4_tempm[1], c = _mat4_tempm[4], d = _mat4_tempm[5],
+            tx = _mat4_tempm[12], ty = _mat4_tempm[13];
 
         let maptw = comp._mapTileSize.width,
             mapth = comp._mapTileSize.height,
@@ -152,10 +153,10 @@ let tmxAssembler = {
             if (camera) {
                 camera.getWorldToCameraMatrix(_mat4_temp2);
                 mat4.mul(_mat4_temp, _mat4_temp2, _mat4_temp);
-                cullingA = _mat4_temp.m00;
-                cullingD = _mat4_temp.m05;
-                cullingMapx = ox * cullingA + oy * _mat4_temp.m04 + _mat4_temp.m12;
-                cullingMapy = ox * _mat4_temp.m01 + oy * cullingD + _mat4_temp.m13;
+                cullingA = _mat4_tempm[0];
+                cullingD = _mat4_tempm[5];
+                cullingMapx = ox * cullingA + oy * _mat4_tempm[4] + _mat4_tempm[12];
+                cullingMapy = ox * _mat4_tempm[1] + oy * cullingD + _mat4_tempm[13];
                 cullingW = tilew * cullingA;
                 cullingH = tileh * cullingD;
             }
@@ -164,8 +165,8 @@ let tmxAssembler = {
                 mat4.invert(_mat4_temp, _mat4_temp);
 
                 let rect = cc.visibleRect;
-                let a = _mat4_temp.m00, b = _mat4_temp.m01, c = _mat4_temp.m04, d = _mat4_temp.m05,
-                    tx = _mat4_temp.m12, ty = _mat4_temp.m13;
+                let a = _mat4_tempm[0], b = _mat4_tempm[1], c = _mat4_tempm[4], d = _mat4_tempm[5],
+                    tx = _mat4_tempm[12], ty = _mat4_tempm[13];
                 let v0x = rect.topLeft.x * a + rect.topLeft.y * c + tx;
                 let v0y = rect.topLeft.x * b + rect.topLeft.y * d + ty;
                 let v1x = rect.bottomLeft.x * a + rect.bottomLeft.y * c + tx;
@@ -260,8 +261,8 @@ let tmxAssembler = {
                     vec3.set(_vec3_temp, -left, -bottom, 0);
                     mat4.translate(_mat4_temp, _mat4_temp, _vec3_temp);
                     mat4.multiply(_mat4_temp, node._worldMatrix, _mat4_temp);
-                    a = _mat4_temp.m00; b = _mat4_temp.m01; c = _mat4_temp.m04; d = _mat4_temp.m05;
-                    tx = _mat4_temp.m12; ty = _mat4_temp.m13;
+                    a = _mat4_tempm[0]; b = _mat4_tempm[1]; c = _mat4_tempm[4]; d = _mat4_tempm[5];
+                    tx = _mat4_tempm[12]; ty = _mat4_tempm[13];
                 }
 
                 right = left + tilew;

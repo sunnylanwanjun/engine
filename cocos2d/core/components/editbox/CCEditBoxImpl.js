@@ -379,13 +379,15 @@ let EditBoxImpl = cc.Class({
         scaleY /= dpr;
     
         let container = cc.game.container;
-        let a = _matrix_temp.m00 * scaleX, b = _matrix.m01, c = _matrix.m04, d = _matrix_temp.m05 * scaleY;
+        let _matrix_tempm = _matrix_temp.m;
+        let _matrixm = _matrix.m;
+        let a = _matrix_tempm[0] * scaleX, b = _matrixm[1], c = _matrixm[4], d = _matrix_tempm[5] * scaleY;
     
         let offsetX = container && container.style.paddingLeft && parseInt(container.style.paddingLeft);
         offsetX += viewport.x / dpr;
         let offsetY = container && container.style.paddingBottom && parseInt(container.style.paddingBottom);
         offsetY += viewport.y / dpr;
-        let tx = _matrix_temp.m12 * scaleX + offsetX, ty = _matrix_temp.m13 * scaleY + offsetY;
+        let tx = _matrix_tempm[12] * scaleX + offsetX, ty = _matrix_tempm[13] * scaleY + offsetY;
     
         if (polyfill.zoomInvalid) {
             this._updateSize(this._size.width * a, this._size.height * d);
@@ -402,7 +404,7 @@ let EditBoxImpl = cc.Class({
 
     _adjustEditBoxPosition () {
         this._node.getWorldMatrix(_matrix);
-        let y = _matrix.m13;
+        let y = _matrix.m[13];
         let windowHeight = cc.visibleRect.height;
         let windowWidth = cc.visibleRect.width;
         let factor = 0.5;

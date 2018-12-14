@@ -165,22 +165,23 @@ let SkinnedMeshRenderer = cc.Class({
 
     _setJointsTextureData (iMatrix, matrix) {
         let arr = this._jointsTextureData;
-        arr[16 * iMatrix + 0] = matrix.m00;
-        arr[16 * iMatrix + 1] = matrix.m01;
-        arr[16 * iMatrix + 2] = matrix.m02;
-        arr[16 * iMatrix + 3] = matrix.m03;
-        arr[16 * iMatrix + 4] = matrix.m04;
-        arr[16 * iMatrix + 5] = matrix.m05;
-        arr[16 * iMatrix + 6] = matrix.m06;
-        arr[16 * iMatrix + 7] = matrix.m07;
-        arr[16 * iMatrix + 8] = matrix.m08;
-        arr[16 * iMatrix + 9] = matrix.m09;
-        arr[16 * iMatrix + 10] = matrix.m10;
-        arr[16 * iMatrix + 11] = matrix.m11;
-        arr[16 * iMatrix + 12] = matrix.m12;
-        arr[16 * iMatrix + 13] = matrix.m13;
-        arr[16 * iMatrix + 14] = matrix.m14;
-        arr[16 * iMatrix + 15] = matrix.m15;
+        var matrixm = matrix.m;
+        arr[16 * iMatrix + 0] = matrixm[0];
+        arr[16 * iMatrix + 1] = matrixm[1];
+        arr[16 * iMatrix + 2] = matrixm[2];
+        arr[16 * iMatrix + 3] = matrixm[3];
+        arr[16 * iMatrix + 4] = matrixm[4];
+        arr[16 * iMatrix + 5] = matrixm[5];
+        arr[16 * iMatrix + 6] = matrixm[6];
+        arr[16 * iMatrix + 7] = matrixm[7];
+        arr[16 * iMatrix + 8] = matrixm[8];
+        arr[16 * iMatrix + 9] = matrixm[9];
+        arr[16 * iMatrix + 10] = matrixm[10];
+        arr[16 * iMatrix + 11] = matrixm[11];
+        arr[16 * iMatrix + 12] = matrixm[12];
+        arr[16 * iMatrix + 13] = matrixm[13];
+        arr[16 * iMatrix + 14] = matrixm[14];
+        arr[16 * iMatrix + 15] = matrixm[15];
     },
 
     _commitJointsData () {

@@ -36,9 +36,10 @@ function obbApplyMatrix (rect, mat4, out_bl, out_tl, out_tr, out_br) {
     var y = rect.y;
     var width = rect.width;
     var height = rect.height;
+    var mat4m = mat4.m;
 
-    var m00 = mat4.m00, m01 = mat4.m01, m04 = mat4.m04, m05 = mat4.m05;
-    var m12 = mat4.m12, m13 = mat4.m13;
+    var m00 = mat4m[0], m01 = mat4m[1], m04 = mat4m[4], m05 = mat4m[5];
+    var m12 = mat4m[12], m13 = mat4m[13];
 
     var tx = m00 * x + m04 * y + m12;
     var ty = m01 * x + m05 * y + m13;
@@ -290,8 +291,9 @@ let CollisionManager = cc.Class({
             world.position.y = _vec2.y;
 
             // calculate world radius
-            let tempx = m.m12, tempy = m.m13;
-            m.m12 = m.m13 = 0;
+            let mm = m.m;
+            let tempx = mm[12], tempy = mm[13];
+            mm[12] = mm[13] = 0;
 
             _vec2.x = collider.radius;
             _vec2.y = 0;
@@ -306,8 +308,8 @@ let CollisionManager = cc.Class({
             aabb.width = d * 2;
             aabb.height = d * 2;
 
-            m.m12 = tempx;
-            m.m13 = tempy;
+            mm[12] = tempx;
+            mm[13] = tempy;
         }
         else if (collider instanceof cc.PolygonCollider) {
             let points = collider.points;

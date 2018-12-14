@@ -110,9 +110,9 @@ module.exports = {
         let row = Math.ceil(vRepeat), 
             col = Math.ceil(hRepeat);
         
-        let matrix = node._worldMatrix;
-        let a = matrix.m00, b = matrix.m01, c = matrix.m04, d = matrix.m05,
-            tx = matrix.m12, ty = matrix.m13;
+        let matrixm = node._worldMatrix.m;
+        let a = matrixm[0],  b = matrixm[1], c = matrixm[4], d = matrixm[5],
+            tx = matrixm[12], ty = matrixm[13];
 
         let x, x1, y, y1, coefu, coefv;
         for (let yindex = 0, ylength = row; yindex < ylength; ++yindex) {

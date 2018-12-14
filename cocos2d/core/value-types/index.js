@@ -54,22 +54,23 @@ math.mat4.fromTRSArray = function (out, trs) {
     var sy = trs[9];
     var sz = trs[10];
   
-    out.m00 = (1 - (yy + zz)) * sx;
-    out.m01 = (xy + wz) * sx;
-    out.m02 = (xz - wy) * sx;
-    out.m03 = 0;
-    out.m04 = (xy - wz) * sy;
-    out.m05 = (1 - (xx + zz)) * sy;
-    out.m06 = (yz + wx) * sy;
-    out.m07 = 0;
-    out.m08 = (xz + wy) * sz;
-    out.m09 = (yz - wx) * sz;
-    out.m10 = (1 - (xx + yy)) * sz;
-    out.m11 = 0;
-    out.m12 = trs[1];
-    out.m13 = trs[2];
-    out.m14 = trs[3];
-    out.m15 = 1;
+    var outm = out.m;
+    outm[0] = (1 - (yy + zz)) * sx;
+    outm[1] = (xy + wz) * sx;
+    outm[2] = (xz - wy) * sx;
+    outm[3] = 0;
+    outm[4] = (xy - wz) * sy;
+    outm[5] = (1 - (xx + zz)) * sy;
+    outm[6] = (yz + wx) * sy;
+    outm[7] = 0;
+    outm[8] = (xz + wy) * sz;
+    outm[9] = (yz - wx) * sz;
+    outm[10] = (1 - (xx + yy)) * sz;
+    outm[11] = 0;
+    outm[12] = trs[1];
+    outm[13] = trs[2];
+    outm[14] = trs[3];
+    outm[15] = 1;
   
     return out;
 }

@@ -27,7 +27,7 @@
 
 const BaseNode = require('./utils/base-node');
 const PrefabHelper = require('./utils/prefab-helper');
-const mathPools = require('./utils/math-pools');
+const transPool = require('./utils/trans-pool');
 const math = require('./renderer/render-engine').math;
 const AffineTrans = require('./utils/affine-transform');
 const eventManager = require('./event-manager');
@@ -1153,8 +1153,10 @@ let NodeDefines = {
         // Mouse event listener
         this._mouseListener = null;
 
+        this._transInfo = transPool.pop();
+
         // Transform / Rotation / Scale data slots, with local dirty flags at 0
-        let trs = this._trs = new Float32Array(11);
+        let trs = this._trs = this._transInfo.trs;
         trs[0] = RenderFlow.FLAG_TRANSFORM;
         trs[3] = 0;
         trs[7] = 1;
@@ -1162,8 +1164,8 @@ let NodeDefines = {
         trs[9] = 1;
         trs[10] = 1;
 
-        this._matrix = mathPools.mat4.get();
-        this._worldMatrix = mathPools.mat4.get();
+        this._matrix = math.mat4.new(this._transInfo.localMat);
+        this._worldMatrix = math.mat4.new(this._transInfo.worldMat);
         this._localMatDirty = LocalDirtyFlag.ALL;
         this._worldMatDirty = true;
 
@@ -1232,9 +1234,9 @@ let NodeDefines = {
             }
         }
 
-        // Recycle math objects
-        mathPools.mat4.put(this._matrix);
-        mathPools.mat4.put(this._worldMatrix);
+        // push back to pool
+        transPool.push(this._transInfo);
+
         this._matrix = this._worldMatrix = null;
 
         if (this._reorderChildDirty) {
@@ -2612,6 +2614,7 @@ let NodeDefines = {
         // Update transform
         let t = this._matrix;
         let trs = this._trs;
+        let tm = t.m;
 
         if (dirtyFlag & (LocalDirtyFlag.TRS | LocalDirtyFlag.SKEW)) {
             let rotation = -this._eulerAngles.z;
@@ -2629,36 +2632,36 @@ let NodeDefines = {
                     b = -c;
                 }
                 // scale
-                t.m00 = a *= sx;
-                t.m01 = b *= sx;
-                t.m04 = c *= sy;
-                t.m05 = d *= sy;
+                tm[0] = a *= sx;
+                tm[1] = b *= sx;
+                tm[4] = c *= sy;
+                tm[5] = d *= sy;
                 // skew
                 if (hasSkew) {
-                    let a = t.m00, b = t.m01, c = t.m04, d = t.m05;
+                    let a = tm[0], b = tm[1], c = tm[4], d = tm[5];
                     let skx = Math.tan(this._skewX * ONE_DEGREE);
                     let sky = Math.tan(this._skewY * ONE_DEGREE);
                     if (skx === Infinity)
                         skx = 99999999;
                     if (sky === Infinity)
                         sky = 99999999;
-                    t.m00 = a + c * sky;
-                    t.m01 = b + d * sky;
-                    t.m04 = c + a * skx;
-                    t.m05 = d + b * skx;
+                    tm[0] = a + c * sky;
+                    tm[1] = b + d * sky;
+                    tm[4] = c + a * skx;
+                    tm[5] = d + b * skx;
                 }
             }
             else {
-                t.m00 = sx;
-                t.m01 = 0;
-                t.m04 = 0;
-                t.m05 = sy;
+                tm[0] = sx;
+                tm[1] = 0;
+                tm[4] = 0;
+                tm[5] = sy;
             }
         }
 
         // position
-        t.m12 = trs[1];
-        t.m13 = trs[2];
+        tm[12] = trs[1];
+        tm[13] = trs[2];
         
         this._localMatDirty = 0;
         // Register dirty status of world matrix so that it can be recalculated
@@ -2683,23 +2686,27 @@ let NodeDefines = {
     },
 
     _mulMat (out, a, b) {
-        let aa=a.m00, ab=a.m01, ac=a.m04, ad=a.m05, atx=a.m12, aty=a.m13;
-        let ba=b.m00, bb=b.m01, bc=b.m04, bd=b.m05, btx=b.m12, bty=b.m13;
+        let am = a.m;
+        let outm = out.m;
+        let bm = b.m;
+
+        let aa=am[0], ab=am[1], ac=am[4], ad=am[5], atx=am[12], aty=am[13];
+        let ba=bm[0], bb=bm[1], bc=bm[4], bd=bm[5], btx=bm[12], bty=bm[13];
         if (ab !== 0 || ac !== 0) {
-            out.m00 = ba * aa + bb * ac;
-            out.m01 = ba * ab + bb * ad;
-            out.m04 = bc * aa + bd * ac;
-            out.m05 = bc * ab + bd * ad;
-            out.m12 = aa * btx + ac * bty + atx;
-            out.m13 = ab * btx + ad * bty + aty;
+            outm[0] = ba * aa + bb * ac;
+            outm[1] = ba * ab + bb * ad;
+            outm[4] = bc * aa + bd * ac;
+            outm[5] = bc * ab + bd * ad;
+            outm[12] = aa * btx + ac * bty + atx;
+            outm[13] = ab * btx + ad * bty + aty;
         }
         else {
-            out.m00 = ba * aa;
-            out.m01 = bb * ad;
-            out.m04 = bc * aa;
-            out.m05 = bd * ad;
-            out.m12 = aa * btx + atx;
-            out.m13 = ad * bty + aty;
+            outm[0] = ba * aa;
+            outm[1] = bb * ad;
+            outm[4] = bc * aa;
+            outm[5] = bd * ad;
+            outm[12] = aa * btx + atx;
+            outm[13] = ad * bty + aty;
         }
     },
 
@@ -3204,10 +3211,10 @@ let NodeDefines = {
          * but it will be reserved and reused for undo.
         */
         if (!this._matrix) {
-            this._matrix = mathPools.mat4.get();
+            this._matrix = math.mat4.new(this._transInfo.localMat);
         }
         if (!this._worldMatrix) {
-            this._worldMatrix = mathPools.mat4.get();
+            this._worldMatrix = math.mat4.new(this._transInfo.worldMat);
         }
 
         this._localMatDirty = LocalDirtyFlag.ALL;

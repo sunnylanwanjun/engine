@@ -142,6 +142,7 @@ function generateNode () {
     let left = new cc.Node('LEFT-PANEL');
     left.anchorX = left.anchorY = 0;
     left.parent = _rootNode;
+    left.color = cc.color(255, 0, 0, 255);
     let leftLabel = left.addComponent(cc.Label);
     leftLabel.font = _atlas;
     leftLabel.fontSize = _fontSize;
@@ -152,6 +153,7 @@ function generateNode () {
     right.anchorY = 0;
     right.x = 200;
     right.parent = _rootNode;
+    right.color = cc.color(255, 0, 0, 255);
     let rightLabel = right.addComponent(cc.Label);
     rightLabel.horizontalAlign = cc.Label.HorizontalAlign.RIGHT;
     rightLabel.font = _atlas;

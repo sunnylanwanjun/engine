@@ -60,10 +60,10 @@ dragonBones.CCArmatureDisplay = cc.Class({
         }
         slot.updateWorldMatrix();
 
-        let worldMatrix = slot._worldMatrix;
         let newPos = cc.v2(0,0);
-        newPos.x = pos.x * worldMatrix.m00 + pos.y * worldMatrix.m04 + worldMatrix.m12;
-        newPos.y = pos.x * worldMatrix.m01 + pos.y * worldMatrix.m05 + worldMatrix.m13;
+        let worldMatrixm = slot._worldMatrix.m;
+        newPos.x = pos.x * worldMatrixm[0] + pos.y * worldMatrixm[4] + worldMatrixm[12];
+        newPos.y = pos.x * worldMatrixm[1] + pos.y * worldMatrixm[5] + worldMatrixm[13];
         return newPos;
     },
 

@@ -204,7 +204,7 @@ let armatureAssembler = {
 
             let vertices = slot._localVertices;
             let slotColor = slot._color;
-            let worldMatrix = slot._worldMatrix;
+            let worldMatrixm = slot._worldMatrix.m;
             let cr = slotColor.r * _nodeR;
             let cg = slotColor.g * _nodeG;
             let cb = slotColor.b * _nodeB;
@@ -216,8 +216,8 @@ let armatureAssembler = {
             for (let j = 0, vl = vertices.length; j < vl; j++) {
                 let vertex = vertices[j];
                 let content = vertexBuffer[_vertexOffset++];
-                content.x = vertex.x * worldMatrix.m00 + vertex.y * worldMatrix.m04 + worldMatrix.m12;
-                content.y = vertex.x * worldMatrix.m01 + vertex.y * worldMatrix.m05 + worldMatrix.m13;
+                content.x = vertex.x * worldMatrixm[0] + vertex.y * worldMatrixm[4] + worldMatrixm[12];
+                content.y = vertex.x * worldMatrixm[1] + vertex.y * worldMatrixm[5] + worldMatrixm[13];
                 content.u = vertex.u;
                 content.v = vertex.v;
                 content.color = color;
