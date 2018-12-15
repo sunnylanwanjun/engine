@@ -8965,7 +8965,7 @@ mat4.str = function (a) {
  * @returns {array}
  */
 mat4.array = function (out, m) {
-    out.m.set(m.m)
+    out.set(m.m);
     return out;
 };
 

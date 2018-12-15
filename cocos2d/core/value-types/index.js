@@ -36,7 +36,7 @@ require('./color');
 let math = cc.vmath = require('../renderer/render-engine').math;
 
 math.mat4.fromTRSArray = function (out, trs) {
-    var x = trs[4], y = trs[5], z = trs[6], w = trs[7];
+    var x = trs[3], y = trs[4], z = trs[5], w = trs[6];
     var x2 = x + x;
     var y2 = y + y;
     var z2 = z + z;
@@ -50,9 +50,9 @@ math.mat4.fromTRSArray = function (out, trs) {
     var wx = w * x2;
     var wy = w * y2;
     var wz = w * z2;
-    var sx = trs[8];
-    var sy = trs[9];
-    var sz = trs[10];
+    var sx = trs[7];
+    var sy = trs[8];
+    var sz = trs[9];
   
     var outm = out.m;
     outm[0] = (1 - (yy + zz)) * sx;
@@ -67,9 +67,9 @@ math.mat4.fromTRSArray = function (out, trs) {
     outm[9] = (yz - wx) * sz;
     outm[10] = (1 - (xx + yy)) * sz;
     outm[11] = 0;
-    outm[12] = trs[1];
-    outm[13] = trs[2];
-    outm[14] = trs[3];
+    outm[12] = trs[0];
+    outm[13] = trs[1];
+    outm[14] = trs[2];
     outm[15] = 1;
   
     return out;

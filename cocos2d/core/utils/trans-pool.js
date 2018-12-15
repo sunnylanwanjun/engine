@@ -23,15 +23,16 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-// Each Node Memerty Layout:
+// Each Node Memery Layout:
 // Space A: [Next Free Offset Or Pre Using Offset]   [Size:1 Uint32]
 // Space B: [Next Using Offset]                      [Size:1 Uint32]
-// Space C: [TRS]                                    [Size:11 Float32]
-// Space D: [LocalMat]                               [Size:16 Float32]
-// Space E: [WorldMat]                               [Size:16 Float32]
+// Space C: [Dirty]                                  [Size:1 Uint32]
+// Space D: [TRS]                                    [Size:10 Float32]
+// Space E: [LocalMat]                               [Size:16 Float32]
+// Space F: [WorldMat]                               [Size:16 Float32]
 // ------------------------------------------------
 // Unit has many Node, layout such as :
-// Node 1 + Node 2 + Node 3 ...
+// HeadFreePointer + TailUsingPointer + Node 1 + Node 2 + Node 3 ...
 // ------------------------------------------------
 // A unit is compose by using "link list" and free "link list",
 // the "link list" is tightness in memerty,not disperse,so it is cache friendly.
@@ -48,142 +49,165 @@ var Unit = function (unitID) {
     
     this.unitID = unitID;
 
-    // tail of the using link list
-    this._tailUsingOffset = INVALID_FLAG;
+    this._data = new Uint32Array(UNIT_SIZE + 2);
+    this._transData = new Uint32Array(this._data.buffer, 2 << 2);
 
     // head of the free link list
-    this._headFreeOffset = 0;
+    this._data[0] = 0;
 
-    this._floatArray = new Float32Array(UNIT_SIZE);
-    this._uintArray = new Uint32Array(this._floatArray.buffer);
+    // tail of the using link list
+    this._data[1] = INVALID_FLAG;
+
     // init each space point to next can use space
     for (var i = 0; i < UNIT_SIZE; i += NODE_SPACE) {
-        this._uintArray[i] = i + NODE_SPACE;
-        this._uintArray[i + 1] = INVALID_FLAG;
+        this._transData[i] = i + NODE_SPACE;
+        this._transData[i + 1] = INVALID_FLAG;
     }
     // last one has no next space;
-    this._uintArray[UNIT_SIZE - NODE_SPACE] = INVALID_FLAG;
+    this._transData[UNIT_SIZE - NODE_SPACE] = INVALID_FLAG;
 }
 
 var UnitProto = Unit.prototype;
 UnitProto.hasSpace = function () {
-    return this._headFreeOffset !== INVALID_FLAG;
+    return this._data[0] !== INVALID_FLAG;
 }
 
+// pop space from unit
 UnitProto.pop = function () {
-    if (this._headFreeOffset === INVALID_FLAG) return undefined;
+    var headFreeOffset = this._data[0];
+    if (headFreeOffset === INVALID_FLAG) return undefined;
 
-    var offset = this._headFreeOffset;
+    var offset = headFreeOffset;
     var space = {
-        trs : new Float32Array(this._floatArray.buffer, (offset + 2) * 4, 11),
-        localMat : new Float32Array(this._floatArray.buffer, (offset + 13) * 4, 16),
-        worldMat : new Float32Array(this._floatArray.buffer, (offset + 29) * 4, 16),
-        floatArray : this._floatArray,
+        dirty : new Uint32Array(this._transData.buffer, (offset + 2) << 2, 1),
+        trs : new Float32Array(this._transData.buffer, (offset + 3) << 2, 10),
+        localMat : new Float32Array(this._transData.buffer, (offset + 13) << 2, 16),
+        worldMat : new Float32Array(this._transData.buffer, (offset + 29) << 2, 16),
         offset : offset,
         unitID : this.unitID
     }
 
     // store new next free space offset
-    var newNextFreeOffset = this._uintArray[offset];
-    // set the space pre using pointer which will pop to use
-    this._uintArray[offset] = this._tailUsingOffset;
-    // set next using space offset
-    this._uintArray[offset + 1] = INVALID_FLAG;
+    var newNextFreeOffset = this._transData[offset];
+
+    var tailUsingOffset = this._data[1];
+    // change pre node next pointer to this node
+    if (tailUsingOffset !== INVALID_FLAG) {
+    	this._transData[tailUsingOffset + 1] = offset;
+    }
+
+    // set this node pre pointer
+    this._transData[offset] = tailUsingOffset;
+    // set this node next pointer
+    this._transData[offset + 1] = INVALID_FLAG;
     // store last using space offset
-    this._tailUsingOffset = offset;
+    this._data[1] = offset;
+
     // store next free space offset
-    this._headFreeOffset = newNextFreeOffset;
+    this._data[0] = newNextFreeOffset;
 
     return space;
 }
 
+// push back to unit
 UnitProto.push = function (offset) {
     // pre using offset
-    var preUsingOffset = this._uintArray[offset];
+    var preUsingOffset = this._transData[offset];
     // next using offset
-    var nextUsingOffset = this._uintArray[offset + 1];
+    var nextUsingOffset = this._transData[offset + 1];
 
-    // if pre using offset is valid,set pre using node's next pointer to "this node"'s next using space
+    // if pre pointer is valid,set pre node's next pointer to "this node"'s next pointer
     if (preUsingOffset !== INVALID_FLAG) {
-        this._uintArray[preUsingOffset + 1] = nextUsingOffset;
+        this._transData[preUsingOffset + 1] = nextUsingOffset;
+    }
+
+    // if next pointer is valid,set next node's pre pointer to "this node"'s pre pointer
+    if (nextUsingOffset !== INVALID_FLAG) {
+    	this._transData[nextUsingOffset] = preUsingOffset;
     }
 
     // if push space is the tail of using list,then update tail of the using list.
-    if (this._tailUsingOffset === offset) {
-        this._tailUsingOffset = preUsingOffset;
+    if (this._data[1] === offset) {
+        this._data[1] = preUsingOffset;
     }
 
     // store head free offset to the space
-    this._uintArray[offset] = this._headFreeOffset;
+    this._transData[offset] = this._data[0];
     // reset next using offset
-    this._uintArray[offset + 1] = INVALID_FLAG;
+    this._transData[offset + 1] = INVALID_FLAG;
     // update head free offset
-    this._headFreeOffset = offset;
+    this._data[0] = offset;
 }
 
+// dump all space info
 UnitProto.dump = function () {
     var spaceNum = 0;
-    var nextOffset = this._headFreeOffset;
+    var nextOffset = this._data[0];
+    var freeStr = "";
     while (nextOffset != INVALID_FLAG) {
         spaceNum ++;
-        nextOffset = this._uintArray[nextOffset];
+        freeStr += nextOffset + "->";
+        nextOffset = this._transData[nextOffset];
     }
     var usingNum = 0;
-    var preUsingOffset = this._tailUsingOffset;
+    var preUsingOffset = this._data[1];
+    var usingStr = "";
     while (preUsingOffset != INVALID_FLAG) {
         usingNum ++;
-        preUsingOffset = this._uintArray[preUsingOffset];
+        usingStr += preUsingOffset + "->";
+        preUsingOffset = this._transData[preUsingOffset];
     }
     console.log("unitID:", this.unitID, "spaceNum:", spaceNum, "useNum:", usingNum, "totalNum:", spaceNum + usingNum, NODE_NUM);
+    console.log("free info:", freeStr);
+    console.log("using info:", usingStr);
 }
 
-var TransPool = cc.Class({
-    ctor () {
-        this._pool = [new Unit(0)];
-        this._findOrder = [this._pool[0]];
-    },
+var TransPool = function () {
+    this._pool = [new Unit(0)];
+    this._findOrder = [this._pool[0]];
+}
 
-    pop () {
-        var findUnit = undefined;
-        var idx = 0;
-        for (var n = this._findOrder.length; idx < n; idx++) {
-            var unit = this._findOrder[idx];
-            if (unit.hasSpace()) {
-                findUnit = unit;
-                break;
-            }
-        }
-
-        if (!findUnit) {
-            findUnit = new Unit(this._pool.length)
-            this._pool.push(findUnit);
-            this._findOrder.push(findUnit);
-            idx = this._findOrder.length - 1;
-        }
-
-        // swap has space unit to first position, so next find will fast
-        var firstUnit = this._findOrder[0];
-        if (firstUnit !== findUnit && findUnit.hasSpace()) {
-            this._findOrder[0] = findUnit;
-            this._findOrder[idx] = firstUnit;
-        }
-
-        return findUnit.pop();
-    },
-
-    push (info) {
-        var unit = this._pool[info.unitID];
-        unit.push(info.offset);
-    },
-
-    // dump unit info
-    dump () {
-        for (var i = 0, n = this._pool.length; i < n; i++) {
-            var unit = this._pool[i];
-            console.log("------------dump unit:",i,unit.unitID);
-            unit.dump();
+var TransPoolProto = TransPool.prototype;
+TransPoolProto.pop = function () {
+    var findUnit = undefined;
+    var idx = 0;
+    for (var n = this._findOrder.length; idx < n; idx++) {
+        var unit = this._findOrder[idx];
+        if (unit.hasSpace()) {
+            findUnit = unit;
+            break;
         }
     }
-});
+
+    if (!findUnit) {
+        findUnit = new Unit(this._pool.length)
+        this._pool.push(findUnit);
+        this._findOrder.push(findUnit);
+        idx = this._findOrder.length - 1;
+    }
+
+    // swap has space unit to first position, so next find will fast
+    var firstUnit = this._findOrder[0];
+    if (firstUnit !== findUnit && findUnit.hasSpace()) {
+        this._findOrder[0] = findUnit;
+        this._findOrder[idx] = firstUnit;
+    }
+
+    return findUnit.pop();
+}
+
+TransPoolProto.push = function (info) {
+    var unit = this._pool[info.unitID];
+    unit.push(info.offset);
+}
+
+// dump unit info
+TransPoolProto.dump = function () {
+    for (var i = 0, n = this._pool.length; i < n; i++) {
+        var unit = this._pool[i];
+        console.log("------------dump unit:",i,unit.unitID);
+        unit.dump();
+    }
+}
 
 module.exports = cc.transPool = new TransPool();
