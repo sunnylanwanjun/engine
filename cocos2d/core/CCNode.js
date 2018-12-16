@@ -1166,7 +1166,7 @@ let NodeDefines = {
         trs[3] = 0;
         trs[4] = 0;
         trs[5] = 0;
-        trs[6] = 0;
+        trs[6] = 1;
         trs[7] = 1;
         trs[8] = 1;
         trs[9] = 1;
@@ -1422,7 +1422,6 @@ let NodeDefines = {
         if (CC_JSB && CC_NATIVERENDERER) {
             this._proxy.setName(this._name);
             this._parent && this._proxy.updateParent(this._parent._proxy);
-            this._proxy.updateJSTRS(this._trs);
         }
     },
 

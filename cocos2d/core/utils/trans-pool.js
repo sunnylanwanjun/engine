@@ -37,7 +37,7 @@
 // A unit is compose by using "link list" and free "link list",
 // the "link list" is tightness in memerty,not disperse,so it is cache friendly.
 // The using link list is a two way link list such as : 
-// one way is: tail -> [ <- using 1 -> ] [<- using 2 -> ] [ <- using 3 -> ] .....
+// tail -> [ <- using 1 -> ] [ <- using 2 -> ] [ <- using 3 -> ] .....
 // The free link list is a single way link list such as :
 // head -> [free 1 ->] [free 2 ->] [free 3 ->]....
 
@@ -45,12 +45,19 @@ var NODE_SPACE = 45;
 var NODE_NUM = 128;
 var UNIT_SIZE = NODE_NUM * NODE_SPACE;
 var INVALID_FLAG = 0xffffffff;
+var transPoolNative = undefined;
+if (CC_JSB && CC_NATIVERENDERER) {
+    transPoolNative = renderer.TransPoolProxy.getInstance();
+}
+
 var Unit = function (unitID) {
     
     this.unitID = unitID;
 
-    this._data = new Uint32Array(UNIT_SIZE + 2);
-    this._transData = new Uint32Array(this._data.buffer, 2 << 2);
+    //this._data = new Uint32Array(UNIT_SIZE + 8);
+    //this._transData = new Uint32Array(this._data.buffer, 8);
+    this._data = new Uint32Array(8);
+    this._transData = new Uint32Array(UNIT_SIZE);
 
     // head of the free link list
     this._data[0] = 0;
@@ -65,6 +72,10 @@ var Unit = function (unitID) {
     }
     // last one has no next space;
     this._transData[UNIT_SIZE - NODE_SPACE] = INVALID_FLAG;
+
+    if (CC_JSB && CC_NATIVERENDERER) {
+        transPoolNative.updateData(unitID, this._data);
+    }
 }
 
 var UnitProto = Unit.prototype;
