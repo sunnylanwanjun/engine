@@ -24,12 +24,13 @@
  ****************************************************************************/
 
 // Each Node Memery Layout:
-// Space A: [Next Free Offset Or Pre Using Offset]   [Size:1 Uint32]
-// Space B: [Next Using Offset]                      [Size:1 Uint32]
-// Space C: [Dirty]                                  [Size:1 Uint32]
-// Space D: [TRS]                                    [Size:10 Float32]
-// Space E: [LocalMat]                               [Size:16 Float32]
-// Space F: [WorldMat]                               [Size:16 Float32]
+// Space : [LocalMat]                               [Size:16 Float32]
+// Space : [WorldMat]                               [Size:16 Float32]
+// Space : [TRS]                                    [Size:10 Float32]
+// Space : [Dirty]                                  [Size:1 Uint32]
+// Space : [Next Free Offset Or Pre Using Offset]   [Size:1 Uint32]
+// Space : [Next Using Offset]                      [Size:1 Uint32]
+// Space : reserve                                  [Size:3 Uint32]
 // ------------------------------------------------
 // Unit has many Node, layout such as :
 // HeadFreePointer + TailUsingPointer + Node 1 + Node 2 + Node 3 ...
@@ -41,10 +42,31 @@
 // The free link list is a single way link list such as :
 // head -> [free 1 ->] [free 2 ->] [free 3 ->]....
 
-var NODE_SPACE = 45;
+// local matrix offset
+var POS_LOCAL = 0;
+// world matrix offset
+var POS_WORLD = 16;
+// trs offset
+var POS_TRS = 32;
+// dirty offset
+var POS_DIRTY = 42;
+// next free pointer offset
+var POS_NEXT_FREE = 43;
+// pre using pointer offset
+var POS_PRE_USING = 43;
+// next using pointer offset
+var POS_NEXT_USING = 44;
+
+// each node occupy space
+var NODE_SPACE = 48;
+// each unit max node capacity
 var NODE_NUM = 128;
+// each unit max memery size
 var UNIT_SIZE = NODE_NUM * NODE_SPACE;
+// invalid pointer value
 var INVALID_FLAG = 0xffffffff;
+
+// native binding
 var transPoolNative = undefined;
 if (CC_JSB && CC_NATIVERENDERER) {
     transPoolNative = renderer.TransPoolProxy.getInstance();
@@ -54,8 +76,6 @@ var Unit = function (unitID) {
     
     this.unitID = unitID;
 
-    //this._data = new Uint32Array(UNIT_SIZE + 8);
-    //this._transData = new Uint32Array(this._data.buffer, 8);
     this._data = new Uint32Array(8);
     this._transData = new Uint32Array(UNIT_SIZE);
 
@@ -67,14 +87,14 @@ var Unit = function (unitID) {
 
     // init each space point to next can use space
     for (var i = 0; i < UNIT_SIZE; i += NODE_SPACE) {
-        this._transData[i] = i + NODE_SPACE;
-        this._transData[i + 1] = INVALID_FLAG;
+        this._transData[i + POS_NEXT_FREE] = i + NODE_SPACE;
+        this._transData[i + POS_NEXT_USING] = INVALID_FLAG;
     }
     // last one has no next space;
-    this._transData[UNIT_SIZE - NODE_SPACE] = INVALID_FLAG;
+    this._transData[UNIT_SIZE - NODE_SPACE + POS_NEXT_FREE] = INVALID_FLAG;
 
     if (CC_JSB && CC_NATIVERENDERER) {
-        transPoolNative.updateData(unitID, this._data);
+        transPoolNative.updateData(unitID, this._data, this._transData);
     }
 }
 
@@ -90,27 +110,27 @@ UnitProto.pop = function () {
 
     var offset = headFreeOffset;
     var space = {
-        dirty : new Uint32Array(this._transData.buffer, (offset + 2) << 2, 1),
-        trs : new Float32Array(this._transData.buffer, (offset + 3) << 2, 10),
-        localMat : new Float32Array(this._transData.buffer, (offset + 13) << 2, 16),
-        worldMat : new Float32Array(this._transData.buffer, (offset + 29) << 2, 16),
+        localMat : new Float32Array(this._transData.buffer, (offset + POS_LOCAL) << 2, 16),
+        worldMat : new Float32Array(this._transData.buffer, (offset + POS_WORLD) << 2, 16),
+        trs : new Float32Array(this._transData.buffer, (offset + POS_TRS) << 2, 10),
+        dirty : new Uint32Array(this._transData.buffer, (offset + POS_DIRTY) << 2, 1),
         offset : offset,
         unitID : this.unitID
     }
 
     // store new next free space offset
-    var newNextFreeOffset = this._transData[offset];
+    var newNextFreeOffset = this._transData[offset + POS_NEXT_FREE];
 
     var tailUsingOffset = this._data[1];
     // change pre node next pointer to this node
     if (tailUsingOffset !== INVALID_FLAG) {
-    	this._transData[tailUsingOffset + 1] = offset;
+    	this._transData[tailUsingOffset + POS_NEXT_USING] = offset;
     }
 
     // set this node pre pointer
-    this._transData[offset] = tailUsingOffset;
+    this._transData[offset + POS_PRE_USING] = tailUsingOffset;
     // set this node next pointer
-    this._transData[offset + 1] = INVALID_FLAG;
+    this._transData[offset + POS_NEXT_USING] = INVALID_FLAG;
     // store last using space offset
     this._data[1] = offset;
 
@@ -123,18 +143,18 @@ UnitProto.pop = function () {
 // push back to unit
 UnitProto.push = function (offset) {
     // pre using offset
-    var preUsingOffset = this._transData[offset];
+    var preUsingOffset = this._transData[offset + POS_PRE_USING];
     // next using offset
-    var nextUsingOffset = this._transData[offset + 1];
+    var nextUsingOffset = this._transData[offset + POS_NEXT_USING];
 
-    // if pre pointer is valid,set pre node's next pointer to "this node"'s next pointer
+    // set pre node's next pointer to "this node"'s next pointer
     if (preUsingOffset !== INVALID_FLAG) {
-        this._transData[preUsingOffset + 1] = nextUsingOffset;
+        this._transData[preUsingOffset + POS_NEXT_USING] = nextUsingOffset;
     }
 
-    // if next pointer is valid,set next node's pre pointer to "this node"'s pre pointer
+    // set next node's pre pointer to "this node"'s pre pointer
     if (nextUsingOffset !== INVALID_FLAG) {
-    	this._transData[nextUsingOffset] = preUsingOffset;
+    	this._transData[nextUsingOffset + POS_PRE_USING] = preUsingOffset;
     }
 
     // if push space is the tail of using list,then update tail of the using list.
@@ -143,9 +163,9 @@ UnitProto.push = function (offset) {
     }
 
     // store head free offset to the space
-    this._transData[offset] = this._data[0];
+    this._transData[offset + POS_NEXT_FREE] = this._data[0];
     // reset next using offset
-    this._transData[offset + 1] = INVALID_FLAG;
+    this._transData[offset + POS_NEXT_USING] = INVALID_FLAG;
     // update head free offset
     this._data[0] = offset;
 }
@@ -158,7 +178,7 @@ UnitProto.dump = function () {
     while (nextOffset != INVALID_FLAG) {
         spaceNum ++;
         freeStr += nextOffset + "->";
-        nextOffset = this._transData[nextOffset];
+        nextOffset = this._transData[nextOffset + POS_NEXT_FREE];
     }
     var usingNum = 0;
     var preUsingOffset = this._data[1];
@@ -166,7 +186,7 @@ UnitProto.dump = function () {
     while (preUsingOffset != INVALID_FLAG) {
         usingNum ++;
         usingStr += preUsingOffset + "->";
-        preUsingOffset = this._transData[preUsingOffset];
+        preUsingOffset = this._transData[preUsingOffset + POS_PRE_USING];
     }
     console.log("unitID:", this.unitID, "spaceNum:", spaceNum, "useNum:", usingNum, "totalNum:", spaceNum + usingNum, NODE_NUM);
     console.log("free info:", freeStr);

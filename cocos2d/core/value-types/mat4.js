@@ -169,7 +169,8 @@ js.mixin(Mat4.prototype, {
      * @return {string}
      */
     toString () {
-        let t = this;
+        let tm = this.m;
+        if (tm == undefined) return "";
         return "[\n" +
             tm[0] + ", " + tm[1] + ", " + tm[2] + ", " + tm[3] + ",\n" +
             tm[4] + ", " + tm[5] + ", " + tm[6] + ", " + tm[7] + ",\n" +

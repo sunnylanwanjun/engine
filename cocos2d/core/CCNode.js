@@ -1364,6 +1364,15 @@ let NodeDefines = {
 
         this._updateOrderOfArrival();
 
+        var desTrs = this._trs;
+        var trs = this._trs = this._transInfo.trs;
+        // just adapt to old trs
+        if (this._trs.length === 11) {
+            trs.set(desTrs.subarray(1));
+        } else {
+            trs.set(desTrs);
+        }
+
         let prefabInfo = this._prefab;
         if (prefabInfo && prefabInfo.sync && prefabInfo.root === this) {
             if (CC_DEV) {
