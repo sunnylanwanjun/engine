@@ -522,6 +522,15 @@ function _doDispatchEvent (owner, event) {
     _cachedArray.length = 0;
 }
 
+// traversal the node tree, child cullingMask must keep the same with the parent.
+function _getActualGroupIndex (node) {
+    let groupIndex = node.groupIndex;
+    if (groupIndex === 0 && node.parent) {
+        groupIndex = _getActualGroupIndex(node.parent);
+    }
+    return groupIndex;
+}
+
 /**
  * !#en
  * Class of all entities in Cocos Creator scenes.<br/>
@@ -591,6 +600,8 @@ let NodeDefines = {
 
             set (value) {
                 this.groupIndex = cc.game.groupList.indexOf(value);
+                let index = _getActualGroupIndex(this);
+                this._cullingMask = 1 << index;
                 this.emit(EventType.GROUP_CHANGED, this);
             }
         },
@@ -1395,6 +1406,9 @@ let NodeDefines = {
 
         this._updateOrderOfArrival();
 
+        // synchronize _cullingMask
+        this._cullingMask = 1 << _getActualGroupIndex(this);
+
         let prefabInfo = this._prefab;
         if (prefabInfo && prefabInfo.sync && prefabInfo.root === this) {
             if (CC_DEV) {
@@ -1433,6 +1447,8 @@ let NodeDefines = {
     _onBatchRestored () {
         this._upgrade_1x_to_2x();
 
+        this._cullingMask = 1 << _getActualGroupIndex(this);
+        
         if (!this._activeInHierarchy) {
             // deactivate ActionManager and EventManager by default
 
