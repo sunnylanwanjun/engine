@@ -107,7 +107,7 @@ cc.renderer = module.exports = {
         this.canvas = canvas;
         if (CC_JSB && CC_NATIVERENDERER) {
             // native codes will create an instance of Device, so just use the global instance.
-            this.device = window.device;
+            this.device = gfx.Device.getInstance();
             this.scene = new renderEngine.Scene();
             let builtins = _initBuiltins(this.device);
             this._forward = new renderEngine.ForwardRenderer(this.device, builtins);
