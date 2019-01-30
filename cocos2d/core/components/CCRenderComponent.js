@@ -148,7 +148,9 @@ let RenderComponent = cc.Class({
             RenderData.free(this.__allocedDatas[i]);
         }
         this.__allocedDatas.length = 0;
-        this._renderHandle && this._renderHandle.destroy();
+        if (CC_JSB && CC_NATIVERENDERER) {
+            this._renderHandle && this._renderHandle.destroy();
+        }
         this._renderData = null;
         this._material = null;
     },
