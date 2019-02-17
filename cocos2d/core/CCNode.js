@@ -534,6 +534,7 @@ function _getActualGroupIndex (node) {
 function _updateCullingMask (node) {
     let index = _getActualGroupIndex(node);
     node._cullingMask = 1 << index;
+    node.emit(EventType.GROUP_CHANGED, node);
     for (let i = 0; i < node._children.length; i++) {
         _updateCullingMask(node._children[i]);
     }
@@ -588,7 +589,14 @@ let NodeDefines = {
          */
         groupIndex: {
             default: 0,
-            type: cc.Integer
+            type: cc.Integer,
+            get () {
+                return this._groupIndex;
+            },
+            set (value) {
+                this._groupIndex = value;
+                _updateCullingMask(this);
+            }
         },
 
         /**
@@ -608,8 +616,6 @@ let NodeDefines = {
 
             set (value) {
                 this.groupIndex = cc.game.groupList.indexOf(value);
-                _updateCullingMask(this);
-                this.emit(EventType.GROUP_CHANGED, this);
             }
         },
 
@@ -987,7 +993,7 @@ let NodeDefines = {
                     if (CC_DEV && value.a !== 255) {
                         cc.warnID(1626);
                     }
-                    
+
                     if (this._renderComponent) {
                         this._renderFlag |= RenderFlow.FLAG_COLOR;
                     }
@@ -1448,6 +1454,7 @@ let NodeDefines = {
             this._parent && this._proxy.updateParent(this._parent._proxy);
             this._proxy.updateJSTRS(this._trs);
             this._proxy.updateOpacity();
+            this._proxy.updateCullingMask();
         }
     },
 
@@ -1480,6 +1487,8 @@ let NodeDefines = {
             this._proxy.setName(this._name);
             this._parent && this._proxy.updateParent(this._parent._proxy);
             this._proxy.updateJSTRS(this._trs);
+            this._proxy.updateOpacity();
+            this._proxy.updateCullingMask();
         }
     },
 
