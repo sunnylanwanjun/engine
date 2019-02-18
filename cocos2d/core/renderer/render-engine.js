@@ -11160,6 +11160,14 @@ prototypeAccessors$5.cullingMask.set = function (mask) {
   this._cullingMask = mask;
 };
 
+Camera.prototype.setPriority = function (priority) {
+    this._sortDepth = priority;
+};
+
+Camera.prototype.getPriority = function () {
+    return this._sortDepth;
+};
+
 Camera.prototype.setCullingMask = function setCullingMask (mask) {
   this._cullingMask = mask;
 };
