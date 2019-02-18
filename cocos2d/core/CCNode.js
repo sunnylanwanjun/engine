@@ -522,6 +522,24 @@ function _doDispatchEvent (owner, event) {
     _cachedArray.length = 0;
 }
 
+// traversal the node tree, child cullingMask must keep the same with the parent.
+function _getActualGroupIndex (node) {
+    let groupIndex = node.groupIndex;
+    if (groupIndex === 0 && node.parent) {
+        groupIndex = _getActualGroupIndex(node.parent);
+    }
+    return groupIndex;
+}
+
+function _updateCullingMask (node) {
+    let index = _getActualGroupIndex(node);
+    node._cullingMask = 1 << index;
+    node.emit(EventType.GROUP_CHANGED, node);
+    for (let i = 0; i < node._children.length; i++) {
+        _updateCullingMask(node._children[i]);
+    }
+}
+
 /**
  * !#en
  * Class of all entities in Cocos Creator scenes.<br/>
@@ -571,7 +589,14 @@ let NodeDefines = {
          */
         groupIndex: {
             default: 0,
-            type: cc.Integer
+            type: cc.Integer,
+            get () {
+                return this._groupIndex;
+            },
+            set (value) {
+                this._groupIndex = value;
+                _updateCullingMask(this);
+            }
         },
 
         /**
@@ -591,7 +616,6 @@ let NodeDefines = {
 
             set (value) {
                 this.groupIndex = cc.game.groupList.indexOf(value);
-                this.emit(EventType.GROUP_CHANGED, this);
             }
         },
 
@@ -969,7 +993,7 @@ let NodeDefines = {
                     if (CC_DEV && value.a !== 255) {
                         cc.warnID(1626);
                     }
-                    
+
                     if (this._renderComponent) {
                         this._renderFlag |= RenderFlow.FLAG_COLOR;
                     }
@@ -1273,6 +1297,7 @@ let NodeDefines = {
 
     _onHierarchyChanged (oldParent) {
         this._updateOrderOfArrival();
+        _updateCullingMask(this);
         if (this._parent) {
             this._parent._delaySort();
         }
@@ -1395,6 +1420,9 @@ let NodeDefines = {
 
         this._updateOrderOfArrival();
 
+        // synchronize _cullingMask
+        this._cullingMask = 1 << _getActualGroupIndex(this);
+
         let prefabInfo = this._prefab;
         if (prefabInfo && prefabInfo.sync && prefabInfo.root === this) {
             if (CC_DEV) {
@@ -1426,6 +1454,7 @@ let NodeDefines = {
             this._parent && this._proxy.updateParent(this._parent._proxy);
             this._proxy.updateJSTRS(this._trs);
             this._proxy.updateOpacity();
+            this._proxy.updateCullingMask();
         }
     },
 
@@ -1433,6 +1462,8 @@ let NodeDefines = {
     _onBatchRestored () {
         this._upgrade_1x_to_2x();
 
+        this._cullingMask = 1 << _getActualGroupIndex(this);
+        
         if (!this._activeInHierarchy) {
             // deactivate ActionManager and EventManager by default
 
@@ -1456,6 +1487,8 @@ let NodeDefines = {
             this._proxy.setName(this._name);
             this._parent && this._proxy.updateParent(this._parent._proxy);
             this._proxy.updateJSTRS(this._trs);
+            this._proxy.updateOpacity();
+            this._proxy.updateCullingMask();
         }
     },
 

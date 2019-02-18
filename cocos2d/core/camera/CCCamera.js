@@ -415,7 +415,7 @@ let Camera = cc.Class({
             let mask = 1 << cc.Node.BuiltinGroupIndex.DEBUG;
             camera.setCullingMask(mask);
             camera.view.cullingMask = mask;
-            camera._sortDepth = cc.macro.MAX_ZINDEX;
+            camera.setPriority(cc.macro.MAX_ZINDEX);
             camera.setClearFlags(0);
             camera.setColor(0, 0, 0, 0);
 
