@@ -507,7 +507,7 @@ let Mask = cc.Class({
     disableRender () {
         this.node._renderFlag &= ~(RenderFlow.FLAG_RENDER | RenderFlow.FLAG_UPDATE_RENDER_DATA | 
                                    RenderFlow.FLAG_POST_RENDER);
-            if (CC_JSB && CC_NATIVERENDERER) {
+        if (CC_JSB && CC_NATIVERENDERER) {
             this._renderHandle.updateEnabled(false);
         }
     },
