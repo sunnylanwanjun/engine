@@ -44,15 +44,25 @@ let TiledLayer = cc.Class({
     },
 
     ctor () {
+        // store the layer tiles, index is caculated by 'x + width * y', format likes '[0]=gid0,[1]=gid1, ...'
         this._tiles = [];
-        this._texGrids = [];
-        this._textures = [];
-        this._spriteTiles = {};
-
+        // store the layer tiles node, index is caculated by 'x + width * y', format likes '[0]=tileNode0,[1]=tileNode1, ...'
         this._tiledTiles = [];
 
         this._layerName = '';
         this._layerOrientation = null;
+        // store all layer gid corresponding texture info, index is gid, format likes '[gid0]=tex-info,[gid1]=tex-info, ...'
+        this._texGrids = null;
+        // store all tileset texture, index is tileset index, format likes '[0]=texture0, [1]=texture1, ...'
+        this._textures = null;
+        this._tilesets = null;
+
+        // store the layer tilesets index array
+        this._tilesetIndexArr = [];
+        // texture id to material index
+        this._texIdToMatIndex = {};
+        // top left vertex array
+        this._vertexArr = [];
     },
 
     /**
@@ -157,33 +167,42 @@ let TiledLayer = cc.Class({
         );
     },
 
-    _positionForHexAt (row, col) {
+    _positionForHexAt (col, row) {
         let tileWidth = this._mapTileSize.width;
         let tileHeight = this._mapTileSize.height;
-        let cols = this._layerSize.height;
-        let offset = this._tileset.tileOffset;
+        let rows = this._layerSize.height;
+
+        let index = Math.floor(col) + Math.floor(row) * this._layerSize.width;
+        let gid = this._tiles[index];
+        let tileset = this._texGrids[gid].tileset;
+        let offset = tileset.tileOffset;
+
         let centerWidth = this.node.width / 2;
         let centerHeight = this.node.height / 2;
         let odd_even = (this._staggerIndex === cc.TiledMap.StaggerIndex.STAGGERINDEX_ODD) ? 1 : -1;
         let x = 0, y = 0;
+        let diffX = 0;
+        let diffX1 = 0;
+        let diffY = 0;
+        let diffY1 = 0;
         switch (this._staggerAxis) {
             case cc.TiledMap.StaggerAxis.STAGGERAXIS_Y:
-                let diffX = 0;
-                let diffX1 = (this._staggerIndex === cc.TiledMap.StaggerIndex.STAGGERINDEX_ODD) ? 0 : tileWidth / 2;
-                if (col % 2 === 1) {
+                diffX = 0;
+                diffX1 = (this._staggerIndex === cc.TiledMap.StaggerIndex.STAGGERINDEX_ODD) ? 0 : tileWidth / 2;
+                if (row % 2 === 1) {
                     diffX = tileWidth / 2 * odd_even;
                 }
-                x = row * tileWidth + diffX + diffX1 + offset.x - centerWidth;
-                y = (cols - col - 1) * (tileHeight - (tileHeight - this._hexSideLength) / 2) - offset.y - centerHeight;
+                x = col * tileWidth + diffX + diffX1 + offset.x - centerWidth;
+                y = (rows - row - 1) * (tileHeight - (tileHeight - this._hexSideLength) / 2) - offset.y - centerHeight;
                 break;
             case cc.TiledMap.StaggerAxis.STAGGERAXIS_X:
-                let diffY = 0;
-                let diffY1 = (this._staggerIndex === cc.TiledMap.StaggerIndex.STAGGERINDEX_ODD) ? tileHeight / 2 : 0;
-                if (row % 2 === 1) {
+                diffY = 0;
+                diffY1 = (this._staggerIndex === cc.TiledMap.StaggerIndex.STAGGERINDEX_ODD) ? tileHeight / 2 : 0;
+                if (col % 2 === 1) {
                     diffY = tileHeight / 2 * -odd_even;
                 }
-                x = row * (tileWidth - (tileWidth - this._hexSideLength) / 2) + offset.x - centerWidth;
-                y = (cols - col - 1) * tileHeight + diffY + diffY1 - offset.y - centerHeight;
+                x = col * (tileWidth - (tileWidth - this._hexSideLength) / 2) + offset.x - centerWidth;
+                y = (rows - row - 1) * tileHeight + diffY + diffY1 - offset.y - centerHeight;
                 break;
         }
         return cc.v2(x, y);
@@ -224,11 +243,11 @@ let TiledLayer = cc.Class({
         if (this._isInvalidPosition(pos)) {
             throw new Error("cc.TiledLayer.setTileGIDAt(): invalid position");
         }
-        if (!this._tiles) {
+        if (!this._tiles || !this._tilesets || this._tilesets.length == 0) {
             cc.logID(7238);
             return;
         }
-        if (gid !== 0 && gid < this._tileset.firstGid) {
+        if (gid !== 0 && gid < this._tilesets[0].firstGid) {
             cc.logID(7239, gid);
             return;
         }
@@ -442,7 +461,7 @@ let TiledLayer = cc.Class({
      * let tileset = tiledLayer.getTileSet();
      */
     getTileSet () {
-        return this._tileset;
+        return this._tilesets[0];
     },
 
     /**
@@ -454,7 +473,13 @@ let TiledLayer = cc.Class({
      * tiledLayer.setTileSet(tileset);
      */
     setTileSet (tileset) {
-        this._tileset = tileset;
+        if (this._tilesetIndexArr.length > 0) {
+            let tilesetIdx = this._tilesetIndexArr[0];
+            this._tilesets[tilesetIdx] = tileset;
+        } else {
+            this._tilesetIndexArr.push(0);
+            this._tilesets[0] = tileset;
+        }
     },
 
     /**
@@ -470,7 +495,6 @@ let TiledLayer = cc.Class({
         return this._layerOrientation;
     },
 
-
     /**
      * !#en properties from the layer. They can be added using Tiled.
      * !#zh 获取 layer 的属性，可以使用 Tiled 编辑器添加属性。
@@ -482,94 +506,6 @@ let TiledLayer = cc.Class({
      */
     getProperties () {
         return this._properties;
-    },
-
-    _init (tileset, layerInfo, mapInfo) {
-        let size = layerInfo._layerSize;
-        
-        // layerInfo
-        this._layerName = layerInfo.name;
-        this._tiles = layerInfo._tiles;
-        this._properties = layerInfo.properties;
-        this._layerSize = size;
-        this._minGID = layerInfo._minGID;
-        this._maxGID = layerInfo._maxGID;
-        this._opacity = layerInfo._opacity;
-        this._staggerAxis = mapInfo.getStaggerAxis();
-        this._staggerIndex = mapInfo.getStaggerIndex();
-        this._hexSideLength = mapInfo.getHexSideLength();
-
-        // tilesetInfo
-        this._tileset = tileset;
-
-        // mapInfo
-        this._layerOrientation = mapInfo.orientation;
-        this._mapTileSize = mapInfo.getTileSize();
-
-        let tilesets = mapInfo._tilesets;
-        if (tilesets) {
-            this._textures.length = tilesets.length;
-            this._texGrids.length = 0;
-            for (let i = 0, l = tilesets.length; i < l; ++i) {
-                let tilesetInfo = tilesets[i];
-                let tex = tilesetInfo.sourceImage;
-                this._textures[i] = tex;
-                this._fillTextureGrids(tilesetInfo, i);
-                if (tileset === tilesetInfo) {
-                    this._texture = tex;
-                }
-            }
-        }
-
-        // offset (after layer orientation is set);
-        this._offset = this._calculateLayerOffset(layerInfo.offset);
-
-        if (this._layerOrientation === cc.TiledMap.Orientation.HEX) {
-            let width = 0, height = 0;
-            if (this._staggerAxis === cc.TiledMap.StaggerAxis.STAGGERAXIS_X) {
-                height = mapInfo._tileSize.height * (this._layerSize.height + 0.5);
-                width = (mapInfo._tileSize.width + this._hexSideLength) * Math.floor(this._layerSize.width / 2) + mapInfo._tileSize.width * (this._layerSize.width % 2);
-            } else {
-                width = mapInfo._tileSize.width * (this._layerSize.width + 0.5);
-                height = (mapInfo._tileSize.height + this._hexSideLength) * Math.floor(this._layerSize.height / 2) + mapInfo._tileSize.height * (this._layerSize.height % 2);
-            }
-            this.node.setContentSize(width, height);
-        } else {
-            this.node.setContentSize(this._layerSize.width * this._mapTileSize.width,
-                this._layerSize.height * this._mapTileSize.height);
-        }
-        this._useAutomaticVertexZ = false;
-        this._vertexZvalue = 0;
-
-        this._activateMaterial();
-    },
-
-    _calculateLayerOffset (pos) {
-        let ret = cc.v2(0,0);
-        switch (this._layerOrientation) {
-            case cc.TiledMap.Orientation.ORTHO:
-                ret = cc.v2(pos.x * this._mapTileSize.width, -pos.y * this._mapTileSize.height);
-                break;
-            case cc.TiledMap.Orientation.ISO:
-                ret = cc.v2((this._mapTileSize.width / 2) * (pos.x - pos.y),
-                    (this._mapTileSize.height / 2 ) * (-pos.x - pos.y));
-                break;
-            case cc.TiledMap.Orientation.HEX:
-                if(this._staggerAxis === cc.TiledMap.StaggerAxis.STAGGERAXIS_Y)
-                {
-                    let diffX = (this._staggerIndex === cc.TiledMap.StaggerIndex.STAGGERINDEX_EVEN) ? this._mapTileSize.width/2 : 0;
-                    ret = cc.v2(pos.x * this._mapTileSize.width + diffX,
-                               -pos.y * (this._mapTileSize.height - (this._mapTileSize.width - this._hexSideLength) / 2));
-                }
-                else if(this._staggerAxis === cc.TiledMap.StaggerAxis.STAGGERAXIS_X)
-                {
-                    let diffY = (this._staggerIndex === cc.TiledMap.StaggerIndex.STAGGERINDEX_ODD) ? this._mapTileSize.height/2 : 0;
-                    ret = cc.v2(pos.x * (this._mapTileSize.width - (this._mapTileSize.width - this._hexSideLength) / 2),
-                               -pos.y * this._mapTileSize.height + diffY);
-                }
-                break;
-        }
-        return ret;
     },
 
     _fillTextureGrids (tileset, texId) {
@@ -584,6 +520,7 @@ let TiledLayer = cc.Class({
             }, this);
             return;
         }
+
         if (!tileset.imageSize.width || !tileset.imageSize.height) {
             tileset.imageSize.width = tex.width;
             tileset.imageSize.height = tex.height;
@@ -616,7 +553,10 @@ let TiledLayer = cc.Class({
             }
 
             grid = {
-                texId: texId,
+                // record texture id
+                texId: texId, 
+                // record belong to which tileset
+                tileset: tileset,
                 x: 0, y: 0, width: tw, height: th,
                 t: 0, l: 0, r: 0, b: 0
             };
@@ -633,28 +573,146 @@ let TiledLayer = cc.Class({
         }
     },
 
+    _traverseAllGrid () {
+
+        // textures
+        this._textures = textures.concat();
+        // grid texture
+        this._texGrids = texGrids.concat();
+        let tilesets = this._tilesets;
+        if (tilesets) {
+            this._textures.length = tilesets.length;
+            this._texGrids.length = 0;
+            for (let i = 0, l = tilesets.length; i < l; ++i) {
+                let tilesetInfo = tilesets[i];
+                this._textures[i] = tilesetInfo.sourceImage;
+                this._fillTextureGrids(tilesetInfo, i);
+            }
+        }
+
+        let tiles = this._tiles;
+        let texGrids = this._texGrids;
+        let tilesetIndexArr = this._tilesetIndexArr;
+        let tilesetIdxMap = {};
+
+        tilesetIndexArr.length = 0;
+        for (let i = 0; i < tiles.length; i++) {
+            let gid = tiles[i];
+            if (gid === 0) continue;
+            let tilesetIdx = texGrids[gid].texId;
+            if (tilesetIdxMap[tilesetIdx]) continue;
+            tilesetIdxMap[tilesetIdx] = true;
+            tilesetIndexArr.push(tilesetIdx);
+        }
+    },
+
+    _init (layerInfo, mapInfo) {
+        let size = layerInfo._layerSize;
+        
+        // layerInfo
+        this._layerName = layerInfo.name;
+        this._tiles = layerInfo._tiles;
+        this._properties = layerInfo.properties;
+        this._layerSize = size;
+        this._minGID = layerInfo._minGID;
+        this._maxGID = layerInfo._maxGID;
+        this._opacity = layerInfo._opacity;
+        this._staggerAxis = mapInfo.getStaggerAxis();
+        this._staggerIndex = mapInfo.getStaggerIndex();
+        this._hexSideLength = mapInfo.getHexSideLength();
+
+        // tilesets
+        this._tilesets = mapInfo.getTilesets().concat();
+
+        // mapInfo
+        this._layerOrientation = mapInfo.orientation;
+        this._mapTileSize = mapInfo.getTileSize();
+
+        // offset (after layer orientation is set);
+        this._offset = this._calculateLayerOffset(layerInfo.offset);
+
+        if (this._layerOrientation === cc.TiledMap.Orientation.HEX) {
+            let width = 0, height = 0;
+            if (this._staggerAxis === cc.TiledMap.StaggerAxis.STAGGERAXIS_X) {
+                height = mapInfo._tileSize.height * (this._layerSize.height + 0.5);
+                width = (mapInfo._tileSize.width + this._hexSideLength) * Math.floor(this._layerSize.width / 2) + mapInfo._tileSize.width * (this._layerSize.width % 2);
+            } else {
+                width = mapInfo._tileSize.width * (this._layerSize.width + 0.5);
+                height = (mapInfo._tileSize.height + this._hexSideLength) * Math.floor(this._layerSize.height / 2) + mapInfo._tileSize.height * (this._layerSize.height % 2);
+            }
+            this.node.setContentSize(width, height);
+        } else {
+            this.node.setContentSize(this._layerSize.width * this._mapTileSize.width,
+                this._layerSize.height * this._mapTileSize.height);
+        }
+        this._useAutomaticVertexZ = false;
+        this._vertexZvalue = 0;
+
+        this._traverseAllGrid();
+        this._activateMaterial();
+    },
+
+    _calculateLayerOffset (pos) {
+        let ret = cc.v2(0,0);
+        switch (this._layerOrientation) {
+            case cc.TiledMap.Orientation.ORTHO:
+                ret = cc.v2(pos.x * this._mapTileSize.width, -pos.y * this._mapTileSize.height);
+                break;
+            case cc.TiledMap.Orientation.ISO:
+                ret = cc.v2((this._mapTileSize.width / 2) * (pos.x - pos.y),
+                    (this._mapTileSize.height / 2 ) * (-pos.x - pos.y));
+                break;
+            case cc.TiledMap.Orientation.HEX:
+                if(this._staggerAxis === cc.TiledMap.StaggerAxis.STAGGERAXIS_Y)
+                {
+                    let diffX = (this._staggerIndex === cc.TiledMap.StaggerIndex.STAGGERINDEX_EVEN) ? this._mapTileSize.width/2 : 0;
+                    ret = cc.v2(pos.x * this._mapTileSize.width + diffX,
+                               -pos.y * (this._mapTileSize.height - (this._mapTileSize.width - this._hexSideLength) / 2));
+                }
+                else if(this._staggerAxis === cc.TiledMap.StaggerAxis.STAGGERAXIS_X)
+                {
+                    let diffY = (this._staggerIndex === cc.TiledMap.StaggerIndex.STAGGERINDEX_ODD) ? this._mapTileSize.height/2 : 0;
+                    ret = cc.v2(pos.x * (this._mapTileSize.width - (this._mapTileSize.width - this._hexSideLength) / 2),
+                               -pos.y * this._mapTileSize.height + diffY);
+                }
+                break;
+        }
+        return ret;
+    },
+
     onEnable () {
         this._super();
         this._activateMaterial();
     },
 
     _activateMaterial () {
-        if (!this._texture) {
+        let tilesetIndexArr = this._tilesetIndexArr;
+        if (tilesetIndexArr.length === 0) {
             this.disableRender();
             return;
         }
 
-        let material = this.sharedMaterials[0];
-        if (!material) {
-            material = Material.getInstantiatedBuiltinMaterial('sprite', this);
-            material.define('USE_TEXTURE', true);
-        }
-        else {
-            material = Material.getInstantiatedMaterial(material, this);
-        }
+        let texIdMatIdx = this._texIdToMatIndex = {};
+        let textures = this._textures;
 
-        material.setProperty('texture', this._texture);
-        this.sharedMaterials[0] = material;
+        for (let i = 0; i < tilesetIndexArr.length; i++) {
+            let tilesetIdx = tilesetIndexArr[i];
+            let texture = textures[tilesetIdx];
+
+            let material = this.sharedMaterials[i];
+            if (!material) {
+                material = Material.getInstantiatedBuiltinMaterial('sprite', this);
+                material.define('USE_TEXTURE', true);
+            }
+            else {
+                material = Material.getInstantiatedMaterial(material, this);
+            }
+
+            material.setProperty('texture', texture);
+            this.sharedMaterials[i] = material;
+
+            texIdMatIdx[tilesetIdx] = i;
+        }
 
         this.markForUpdateRenderData(true);
         this.markForRender(true);

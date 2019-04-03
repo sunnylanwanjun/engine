@@ -116,6 +116,10 @@ let TiledObjectGroup = cc.Class({
         return this._objects;
     },
 
+    _addImage (gid) {
+        
+    },
+
     _init (groupInfo, mapInfo) {
         this._groupName = groupInfo.name;
         this._positionOffset = groupInfo.offset;
@@ -143,6 +147,11 @@ let TiledObjectGroup = cc.Class({
         for (let i = 0, l = objects.length; i < l; i++) {
             let object = objects[i];
             object.offset = cc.v2(object.x, object.y);
+
+            let imageGID = object.gid;
+            if (imageGID) {
+                this._addImage(imageGID);
+            }
 
             let points = object.points || object.polylinePoints;
             if (points) {

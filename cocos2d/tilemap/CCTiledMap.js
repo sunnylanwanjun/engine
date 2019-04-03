@@ -473,13 +473,13 @@ let TiledMap = cc.Class({
         // remove the layers & object groups added before
         let layers = this._layers;
         for (let i = 0, l = layers.length; i < l; i++) {
-            layers[i].node.removeFromParent();
+            layers[i].node.destroy();
         }
         layers.length = 0;
 
         let groups = this._groups;
         for (let i = 0, l = groups.length; i < l; i++) {
-            groups[i].node.removeFromParent();
+            groups[i].node.destroy();
         }
         groups.length = 0;
     },
@@ -490,14 +490,13 @@ let TiledMap = cc.Class({
             this._layers[i].node.setAnchorPoint(anchor);
         }
     },
-    
+
     _buildWithMapInfo (mapInfo) {
         this._mapSize = mapInfo.getMapSize();
         this._tileSize = mapInfo.getTileSize();
         this._mapOrientation = mapInfo.orientation;
         this._properties = mapInfo.properties;
         this._tileProperties = mapInfo.getTileProperties();
-
         this._releaseMapInfo();
 
         let layers = this._layers;
@@ -523,8 +522,7 @@ let TiledMap = cc.Class({
                         layer = child.addComponent(cc.TiledLayer);
                     }
 
-                    let tileset = this._tilesetForLayer(layerInfo, mapInfo);
-                    layer._init(tileset, layerInfo, mapInfo);
+                    layer._init(layerInfo, mapInfo);
 
                     // tell the layerinfo to release the ownership of the tiles map.
                     layerInfo.ownTiles = false;
@@ -549,36 +547,6 @@ let TiledMap = cc.Class({
 
         this._syncAnchorPoint();
     },
-
-    _tilesetForLayer (layerInfo, mapInfo) {
-        let size = layerInfo._layerSize;
-        let tilesets = mapInfo.getTilesets();
-        if (tilesets) {
-            for (let i = tilesets.length - 1; i >= 0; i--) {
-                let tileset = tilesets[i];
-                if (tileset) {
-                    for (let y = 0; y < size.height; y++) {
-                        for (let x = 0; x < size.width; x++) {
-                            let pos = x + size.width * y;
-                            let gid = layerInfo._tiles[pos];
-                            if (gid !== 0) {
-                                // Optimization: quick return
-                                // if the layer is invalid (more than 1 tileset per layer) an cc.assert will be thrown later
-                                if (((gid & cc.TiledMap.TileFlag.FLIPPED_MASK)>>>0) >= tileset.firstGid) {
-                                    return tileset;
-                                }
-                            }
-
-                        }
-                    }
-                }
-            }
-        }
-
-        // If all the tiles are 0, return empty tileset
-        cc.logID(7215, layerInfo.name);
-        return null;
-    }
 });
 
 cc.TiledMap = module.exports = TiledMap;
