@@ -48,7 +48,6 @@ let TiledObjectGroup = cc.Class({
         return this._positionOffset;
     },
 
-
     /**
      * !#en List of properties stored in a dictionary.
      * !#zh 以映射的形式获取属性列表。
