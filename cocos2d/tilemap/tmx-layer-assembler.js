@@ -33,12 +33,13 @@ const vfmtPosUvColor = require('../core/renderer/webgl/vertex-format').vfmtPosUv
 
 import InputAssembler from '../renderer/core/input-assembler';
 
-const TileFlag = TiledMap.TileFlag;
+const Orientation = TiledMap.Orientation;
 const maxGridsLimit = parseInt(65535 / 4);
 
 import { mat4 } from '../core/vmath';
 
 let _mat4_temp = mat4.create();
+let _leftDown = {row:0, col:0};
 
 let SpineBuffer = require('../core/renderer/webgl/spine-buffer');
 let TiledMapBuffer = cc.Class({
@@ -98,9 +99,16 @@ let tmxAssembler = {
         if (comp._isClipDirty()) {
             buffer.reset();
 
-            let clipRect = comp._clipRect;
-            let leftDown = clipRect.leftDown;
-            let rightTop = clipRect.rightTop;
+            let leftDown, rightTop;
+            if (comp.enableClip) {
+                let clipRect = comp._clipRect;
+                leftDown = clipRect.leftDown;
+                rightTop = clipRect.rightTop;
+            } else {
+                leftDown = _leftDown;
+                rightTop = comp._rightTop;
+            }
+
             let maxRows = rightTop.row - leftDown.row + 1;
             let maxCols = rightTop.col - leftDown.col + 1;
             let maxGrids = maxRows * maxCols;

@@ -545,16 +545,10 @@ let TiledMap = cc.Class({
                 }
 
                 if (layerInfo instanceof cc.TMXLayerInfo && layerInfo.visible) {
-                    let layerMgr = child.getComponent(cc.TiledLayerMgr);
-                    if (!layerMgr) {
-                        layerMgr = child.addComponent(cc.TiledLayerMgr);
+                    let layer = child.getComponent(cc.TiledLayer);
+                    if (!layer) {
+                        layer = child.addComponent(cc.TiledLayer);
                     }
-                    layerMgr.setTiledMap(this);
-                    layerMgr.layerName = name;
-
-                    let layer = layerMgr.getTiledComponent();
-                    if (layer) layer.destroy();
-                    layer = child.addComponent(cc.TiledLayer);
                     
                     layer._init(layerInfo, mapInfo, tilesets, textures, texGrids);
 
