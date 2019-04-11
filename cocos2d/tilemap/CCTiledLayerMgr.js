@@ -64,10 +64,12 @@ let TiledLayerMgr = cc.Class({
             },
             editorOnly: true,
             visible: true,
+            animatable: false,
+            displayName: "Debug Clip Rect",
             tooltip: CC_DEV && 'i18n:COMPONENT.tiled_map.debug_clip'
         },
 
-        _tiledType: -1,
+        _tiledType: TiledType.TILED_BATCH,
         _defaultTiledType: {
             default: TiledType.TILED_BATCH,
             type: DefaultTiledType,
@@ -79,7 +81,21 @@ let TiledLayerMgr = cc.Class({
             animatable: false,
             displayName: "Tiled Render Mode",
             tooltip: CC_DEV && 'i18n:COMPONENT.tiled_map.tiled_render_mode'
-        }
+        },
+
+        _enableClip : {
+            default: true,
+            notify () {
+                
+            },
+            editorOnly: true,
+            visible: true,
+            animatable: false,
+            displayName: "Enable Clip",
+            tooltip: CC_DEV && 'i18n:COMPONENT.tiled_map.enable_clip'
+        },
+
+        layerName : '',
     },
 
     statics: {
@@ -87,17 +103,22 @@ let TiledLayerMgr = cc.Class({
     },
 
     ctor () {
-        
+        this._tiledMap = null;
     },
 
-    /**
-     * !#en Updates debug clip.
-     * !#zh 更新调试裁剪节点。
-     * @method _updateDebugClip
-     * @return {cc.Component}
-     */
+    _setTiledMap (tiledMap) {
+        this._tiledMap = tiledMap;
+    },
+
+    start () {
+        // default close debug clip
+        this._debugClip = false;
+
+    },
+
     _updateDebugClip () {
         let comp = this.getTiledComponent();
+        if (!comp) return;
         if (this._debugClip) {
             comp._enableClipNode();
         } else {
@@ -125,23 +146,32 @@ let TiledLayerMgr = cc.Class({
      * @return {cc.Component}
      */
     setTiledType (tiledType) {
-        let comp = this.getTiledComponent();
+        let oldComp = this.getTiledComponent();
         if (this._tiledType === tiledType) {
-            return comp;
+            return oldComp;
         }
-        // destroy old tiled component
-        if (comp) comp.destroy();
-
+        
+        let newComp = null;
         switch (this._tiledType) {
             case TiledType.TILED_NODE:
-            comp = this.node.addComponent(cc.TiledLayer);
+            newComp = this.node.addComponent(cc.TiledLayer);
             break;
             default:
-            comp = this.node.addComponent(cc.TiledNode);
+            newComp = this.node.addComponent(cc.TiledNode);
             break;
         }
+
+        // ??????????????? 写到这，能过TiledMap去获取layerInfo，比较保障
+        // tiledlayer通过tiledlayermgr获取数据，不要用layermgr去通知tiledlayer
+
+        if (oldComp) {
+            newComp._init(oldComp._layerInfo, oldComp._mapInfo, oldComp._tilesets, oldComp._textures, oldComp._texGrids);
+            this._tiledMap._changeLayer(oldComp.getLayerName(), newComp);
+            oldComp.destroy();
+        }
+        
         this._tiledType = tiledType;
-        return comp;
+        return newComp;
     },
 });
 

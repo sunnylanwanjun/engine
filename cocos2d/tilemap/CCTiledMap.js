@@ -400,8 +400,18 @@ let TiledMap = cc.Class({
                 return layer;
             }
         }
-
         return null;
+    },
+
+    _changeLayer (layerName, replaceLayer) {
+        let layers = this._layers;
+        for (let i = 0, l = layers.length; i < l; i++) {
+            let layer = layers[i];
+            if (layer && layer.getLayerName() === layerName) {
+                layers[i] = replaceLayer;
+                return;
+            }
+        }
     },
 
     /**
@@ -440,11 +450,11 @@ let TiledMap = cc.Class({
     },
 
     onEnable () {
-        this.node.on(cc.Node.EventType.ANCHOR_CHANGED, this._syncAnchorPoint, this);
+        this.node.on(cc.Node.EventType.ANCHOR_CHANGED, this._adjustLayerPos, this);
     },
 
     onDisable () {
-        this.node.off(cc.Node.EventType.ANCHOR_CHANGED, this._syncAnchorPoint, this);
+        this.node.off(cc.Node.EventType.ANCHOR_CHANGED, this._adjustLayerPos, this);
     },
 
     _applyFile () {
@@ -474,7 +484,7 @@ let TiledMap = cc.Class({
             this._buildWithMapInfo(mapInfo);
         }
         else {
-            this._releaseMapInfo()
+            this._releaseMapInfo();
         }
     },
 
@@ -493,10 +503,15 @@ let TiledMap = cc.Class({
         groups.length = 0;
     },
 
-    _syncAnchorPoint () {
+    _adjustLayerPos () {
         let anchor = this.node.getAnchorPoint();
+        let nx = this.node.width * (0.5 - anchor.x);
+        let ny = this.node.height * (0.5 - anchor.y);
         for (let i = 0, l = this._layers.length; i < l; i++) {
-            this._layers[i].node.setAnchorPoint(anchor);
+            let layerNode = this._layers[i].node;
+            if (layerNode) {
+                layerNode._adjustLayerPos(nx, ny);
+            }
         }
     },
 
@@ -516,6 +531,7 @@ let TiledMap = cc.Class({
         let node = this.node;
         let layerInfos = mapInfo.getAllChildren();
         let textures = this._textures;
+        let maxWidth = 0, maxHeight = 0;
         if (layerInfos && layerInfos.length > 0) {
             for (let i = 0, len = layerInfos.length; i < len; i++) {
                 let layerInfo = layerInfos[i];
@@ -525,24 +541,29 @@ let TiledMap = cc.Class({
                 if (!child) {
                     child = new cc.Node();
                     child.name = name;
-                    
                     node.addChild(child);
                 }
 
                 if (layerInfo instanceof cc.TMXLayerInfo && layerInfo.visible) {
                     let layerMgr = child.getComponent(cc.TiledLayerMgr);
-                    let layer = layerMgr.getTiledComponent();
-                    if (!layer) {
-                        layer = layerMgr.setTiledType(cc.TiledLayerMgr.TiledType.TILED_BATCH);
+                    if (!layerMgr) {
+                        layerMgr = child.addComponent(cc.TiledLayerMgr);
                     }
+                    layerMgr.setTiledMap(this);
+                    layerMgr.layerName = name;
+
+                    let layer = layerMgr.getTiledComponent();
+                    if (layer) layer.destroy();
+                    layer = child.addComponent(cc.TiledLayer);
+                    
                     layer._init(layerInfo, mapInfo, tilesets, textures, texGrids);
 
                     // tell the layerinfo to release the ownership of the tiles map.
                     layerInfo.ownTiles = false;
 
                     // update content size with the max size
-                    this.node.width = Math.max(this.node.width, child.width);
-                    this.node.height = Math.max(this.node.height, child.height);
+                    if (maxWidth < child.width) maxWidth = child.width;
+                    if (maxHeight < child.height) maxHeight = child.height;
 
                     layers.push(layer);
                 }
@@ -558,6 +579,8 @@ let TiledMap = cc.Class({
             }
         }
 
+        this.node.width = maxWidth;
+        this.node.height = maxHeight;
         this._syncAnchorPoint();
     },
 
@@ -655,7 +678,8 @@ cc.TiledMap.fillTextureGrids = function (tileset, texGrids, texId) {
             tileset: tileset,
             spriteFrame: null,
             x: 0, y: 0, width: tw, height: th,
-            t: 0, l: 0, r: 0, b: 0
+            t: 0, l: 0, r: 0, b: 0,
+            gid: gid
         };
         tileset.rectForGID(gid, grid);
         grid.x += texelCorrect;

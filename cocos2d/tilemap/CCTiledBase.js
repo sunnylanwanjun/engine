@@ -24,8 +24,8 @@
  THE SOFTWARE.
  ****************************************************************************/
 /**
- * !#en Render the TMX layer.
- * !#zh 渲染 TMX layer。
+ * !#en Render the TMX layer base class.
+ * !#zh 渲染 TMX layer 基类。
  * @class TiledLayer
  * @extends Component
  */
@@ -33,15 +33,32 @@ let TiledBase = cc.Class({
     name: 'cc.TiledBase',
 
     ctor () {
-        // render range
-        this._range = {x:0, y:0, width:0, height:0};
+        this._viewPort = {x:-1, y:-1, width:-1, height:-1};
+        this._clipRect = {
+            leftDown:{row:-1, col:-1},
+            rightTop:{row:-1, col:-1}
+        };
+        this._clipDirty = true;
+        this._rightTop = {row:-1, col:-1};
 
-        this._rangeDirty = true;
+        this._layerInfo = null;
+        this._mapInfo = null;
+
+        // record max or min tile texture offset, 
+        // it will make clip rect more large, which insure clip rect correct.
+        this._topOffset = 0;
+        this._downOffset = 0;
+        this._leftOffset = 0;
+        this._rightOffset = 0;
+
+        this._tempRowCol = {row:0, col:0};
 
         // store the layer tiles, index is caculated by 'x + width * y', format likes '[0]=gid0,[1]=gid1, ...'
         this._tiles = [];
         // vertex array
         this._vertices = [];
+        // vertices dirty
+        this._verticesDirty = true;
 
         this._layerName = '';
         this._layerOrientation = null;
@@ -52,7 +69,7 @@ let TiledBase = cc.Class({
         this._tilesets = null;
 
         // use to debug layer clip range
-        this._clipNode = null;
+        this._clipHandleNode = null;
     },
 
     /**
@@ -447,43 +464,153 @@ let TiledBase = cc.Class({
                 if (!tilesetInfo) continue;
                 cc.TiledMap.fillTextureGrids(tilesetInfo, texGrids, i);
             }
+            // Force update vertices, or will triggle error since assembler may not find texture.
             this._updateVertices();
             this._prepareToRender();
         }.bind(this));
     },
 
+    // just for test clip
     _enableClipNode () {
-        if (!this._clipNode) {
-            this._clipNode = new cc.Node();
-            this._clipNode.parent = this;
+        this._clipHandleNode = this.node.getChildByName("TESTCLIP");
+        if (!this._clipHandleNode) {
+            this._clipHandleNode = new cc.Node();
+            this._clipHandleNode.name = 'TESTCLIP';
+            this._clipHandleNode.parent = this;
+            this._clipHandleNode.width = 300;
+            this._clipHandleNode.height = 300;
         }
     },
 
     _disableClipNode () {
-        if (this._clipNode) {
-            this._clipNode.destroy();
-            this._clipNode = null;
+        this._clipHandleNode = this.node.getChildByName("TESTCLIP");
+        if (this._clipHandleNode) {
+            this._clipHandleNode.destroy();
+            this._clipHandleNode = null;
         }
     },
 
-    
-
-    _setClipSize (width, height) {
-        this._rangeDirty = (this._rangeDirty || this._range.width !== width || this._range.height !== height);
-        this._range.width = width;
-        this._range.height = height;
+    _setClipDirty (value) {
+        this._clipDirty = value;
     },
 
-    _setClipPosition (x, y) {
-        this._rangeDirty = (this._rangeDirty || this._range.x !== x || this._range.y !== y);
-        this._range.x = x;
-        this._range.y = y;
+    _isClipDirty () {
+        return this._clipDirty;
+    },
+
+    // 'x, y' is the position of viewPort, which's anchor point is at the center of rect.
+    // 'width, height' is the size of viewPort.
+    _updateViewPort (x, y, width, height) {
+        if (this._viewPort.width === width && 
+            this._viewPort.height === height &&
+            this._viewPort.x === x &&
+            this._viewPort.y === y) {
+            return;
+        }
+        this._viewPort.x = x;
+        this._viewPort.y = y;
+        this._viewPort.width = width;
+        this._viewPort.height = height;
+
+        let vpx = this._viewPort.x - this._offset.x;
+        let vpy = this._viewPort.y - this._offset.y;
+        let halfW = width * 0.5;
+        let halfH = height * 0.5;
+
+        let leftDownX = vpx - halfW + this._leftOffset;
+        let leftDownY = vpy - halfH + this._downOffset;
+        let rightTopX = vpx + halfW + this._rightOffset;
+        let rightTopY = vpy + halfH + this._topOffset;
+
+        if (leftDownX < 0) leftDownX = 0;
+        if (leftDownY < 0) leftDownY = 0;
+        if (rightTopX < 0) rightTopX = 0;
+        if (rightTopY < 0) rightTopY = 0;
+
+        let leftDown = this._clipRect.leftDown;
+        let rightTop = this._clipRect.rightTop;
+        let tempRowCol = this._tempRowCol;
+
+        // calc left down
+        this._positionToRowCol(leftDownX, leftDownY, tempRowCol);
+        // make range large
+        if (tempRowCol.row >= 1) tempRowCol.row--;
+        if (tempRowCol.col >= 1) tempRowCol.col--;
+        if (tempRowCol.row !== leftDown.row || tempRowCol.col !== leftDown.col) {
+            leftDown.row = tempRowCol.row;
+            leftDown.col = tempRowCol.col;
+            this._clipDirty = true;
+        }
+
+        // calc right top
+        this._positionToRowCol(rightTopX, rightTopY, tempRowCol);
+        // make range large
+        tempRowCol.row++;
+        tempRowCol.col++;
+        if (tempRowCol.row !== rightTop.row || tempRowCol.col !== rightTop.col) {
+            rightTop.row = tempRowCol.row;
+            rightTop.col = tempRowCol.col;
+            this._clipDirty = true;
+        }
+
+        // avoid range out of max rect
+        if (rightTop.row > this._rightTop.row) rightTop.row = this._rightTop.row;
+        if (rightTop.col > this._rightTop.col) rightTop.col = this._rightTop.col;
+
+        // calc clip rect
+        this._clipDirty = true;
+    },
+
+    // it result may not precise, but dose't matter, it just use to get range
+    _positionToRowCol (x, y, result) {
+        const TiledMap = cc.TiledMap;
+        const Orientation = TiledMap.Orientation;
+        const StaggerAxis = TiledMap.StaggerAxis;
+
+        let maptw = this._mapTileSize.width,
+            mapth = this._mapTileSize.height,
+            maptw2 = maptw * 0.5,
+            mapth2 = mapth * 0.5;
+        let row = 0, col = 0, diffX2 = 0, diffY2 = 0, axis = this._staggerAxis;
+
+        switch (this._layerOrientation) {
+            // left top to right dowm
+            case Orientation.ORTHO:
+                col = Math.floor(x / maptw);
+                row = Math.floor(y / mapth);
+                break;
+            // right top to left down
+            case Orientation.ISO:
+                col = Math.floor(x / maptw2);
+                row = Math.floor(y / mapth2);
+                break;
+            // left top to right dowm
+            case Orientation.HEX:
+                if (axis === StaggerAxis.STAGGERAXIS_Y) {
+                    row = Math.floor(y / (mapth - this._diffY1));
+                    diffX2 = row % 2 === 1 ? maptw2 * this._odd_even : 0;
+                    col = Math.floor((x - diffX2) / maptw);
+                } else {
+                    col = Math.floor(x / (maptw - this._diffX1));
+                    diffY2 = col % 2 === 1 ? mapth2 * -this._odd_even : 0;
+                    row = Math.floor((y - diffY2) / mapth);
+                }
+                break;
+        }
+        result.row = row > 0 ? row : 0;
+        result.col = col > 0 ? col : 0;
+        return result;
     },
 
     update () {
-        if (this._clipNode) {
-            this._setClipSize(this._clipNode.width, this._clipNode.height);
-            this._setClipPosition(this._clipNode.x, this._clipNode.y);
+        if (this._clipHandleNode) {
+            this._updateViewPort(this._clipHandleNode.x, this._clipHandleNode.y, this._clipHandleNode.width, this._clipHandleNode.height);
+        } else {
+
+        }
+
+        if (this._verticesDirty) {
+            this._updateVertices();
         }
     },
 
@@ -516,13 +643,15 @@ let TiledBase = cc.Class({
         return this._properties;
     },
 
-    _updateVertices () {
+    _setVerticesDirty () {
+        this._verticesDirty = true;
+    },
 
+    _updateVertices () {
         const TiledMap = cc.TiledMap;
         const TileFlag = TiledMap.TileFlag;
         const FLIPPED_MASK = TileFlag.FLIPPED_MASK;
         const StaggerAxis = TiledMap.StaggerAxis;
-        const StaggerIndex = TiledMap.StaggerIndex;
         const Orientation = TiledMap.Orientation;
 
         let vertices = this._vertices;
@@ -534,6 +663,10 @@ let TiledBase = cc.Class({
         if (!tiles || !this._tileset) {
             return;
         }
+
+        let rightTop = this._rightTop;
+        rightTop.row = -1;
+        rightTop.col = -1;
 
         let maptw = this._mapTileSize.width,
             mapth = this._mapTileSize.height,
@@ -547,15 +680,16 @@ let TiledBase = cc.Class({
             axis, diffX1, diffY1, odd_even, diffX2, diffY2;
 
         if (layerOrientation === Orientation.HEX) {
-            let hexSideLength = this._hexSideLength;
             axis = this._staggerAxis;
-            odd_even = (this._staggerIndex === StaggerIndex.STAGGERINDEX_ODD) ? 1 : -1;
-            diffX1 = (axis === StaggerAxis.STAGGERAXIS_X) ? ((maptw - hexSideLength)/2) : 0;
-            diffY1 = (axis === StaggerAxis.STAGGERAXIS_Y) ? ((mapth - hexSideLength)/2) : 0;
+            diffX1 = this._diffX1;
+            diffY1 = this._diffY1;
+            odd_even = this._odd_even;
         }
 
         let clipCol = 0, clipRow = 0;
-        
+        let tileOffset = null;
+        let flippedX = false, flippedY = false, tempVal;
+
         for (let row = 0; row < rows; ++row) {
             for (let col = 0; col < cols; ++col) {
                 let index = colOffset + col;
@@ -595,24 +729,106 @@ let TiledBase = cc.Class({
                         diffY2 = (axis === StaggerAxis.STAGGERAXIS_X && col % 2 === 1) ? mapth2 * -odd_even : 0;
 
                         left = col * (maptw - diffX1) + diffX2;
-                        bottom = (rows - row - 1) * (mapth -diffY1) + diffY2;
+                        bottom = (rows - row - 1) * (mapth - diffY1) + diffY2;
                         clipCol = col;
                         clipRow = rows - row - 1;
                         break;
                 }
 
-                let rowData = vertices[clipRow] = vertices[clipRow] || [];
+                let rowData = vertices[clipRow] = vertices[clipRow] || {minCol:0, maxCol:0};
                 let colData = rowData[clipCol] = rowData[clipCol] || {};
                 
+                // record each row range, it will faster when clip grid
+                if (rowData.minCol < clipCol) {
+                    rowData.minCol = clipCol;
+                }
+
+                if (rowData.maxCol > clipCol) {
+                    rowData.maxCol = clipCol;
+                }
+
+                // record max rect, when viewPort is bigger than layer, can make it smaller
+                if (rightTop.row < clipRow) {
+                    rightTop.row = clipRow;
+                }
+
+                if (rightTop.col < clipCol) {
+                    rightTop.col = clipCol;
+                }
+
+                // _offset is whole layer offset
+                // tileOffset is tileset offset which is related to each grid
+                // tileOffset coordinate system's y axis is opposite with engine's y axis.
+                tileOffset = grid.tileset.tileOffset;
+                left += this._offset.x + tileOffset.x;
+                bottom += this._offset.y - tileOffset.y;
+
+                // record the far left, handle the offset like the shape '←' which is negative number, 
+                // so must get negation
+                if (this._leftOffset < -tileOffset.x) {
+                    this._leftOffset = -tileOffset.x;
+                }
+
+                // record the far right, handle the offset like the shape '→' which is positive number, 
+                // so must get negation
+                if (this._rightOffset < -tileOffset.x) {
+                    this._rightOffset = -tileOffset.x;
+                }
+
+                // record the far top, handle the offset like the shape '↓' which is positive number,
+                // so need not get negation
+                if (this._topOffset < tileOffset.y) {
+                    this._topOffset = tileOffset.y;
+                }
+
+                // record the far down, handle the offset like the shape '↑' which is negative number,
+                // so need not get negation
+                if (this._downOffset < tileOffset.y) {
+                    this._downOffset = tileOffset.y;
+                }
+
                 colData.left = left;
                 colData.bottom = bottom;
                 colData.grid = grid;
+                colData.index = index;
+                colData.r = grid.r;
+                colData.l = grid.l;
+                colData.b = grid.b;
+                colData.t = grid.t;
+
+                // Rotation and Flip
+                if (gid > TileFlag.DIAGONAL) {
+                    flippedX = (gid & TileFlag.HORIZONTAL) >>> 0;
+                    flippedY = (gid & TileFlag.VERTICAL) >>> 0;
+        
+                    if (flippedX) {
+                        tempVal = colData.r;
+                        colData.r = colData.l;
+                        colData.l = tempVal;
+                    }
+        
+                    if (flippedY) {
+                        tempVal = colData.b;
+                        colData.b = colData.t;
+                        colData.t = tempVal;
+                    }
+                }
             }
             colOffset += cols;
         }
+        this._verticesDirty = false;
+    },
+
+    // px, py is center pos of parent
+    _adjustLayerPos (cx, cy) {
+        this.node.x = cx - this.node.width * 0.5;
+        this.node.y = cy - this.node.height * 0.5;
     },
 
     _initBase (layerInfo, mapInfo, tilesets, textures, texGrids) {
+        this._layerInfo = layerInfo;
+        this._mapInfo = mapInfo;
+
         let size = layerInfo._layerSize;
 
         // layerInfo
@@ -638,25 +854,41 @@ let TiledBase = cc.Class({
         this._layerOrientation = mapInfo.orientation;
         this._mapTileSize = mapInfo.getTileSize();
 
-        // offset (after layer orientation is set);
-        this._offset = this._calculateLayerOffset(layerInfo.offset);
-
         if (this._layerOrientation === cc.TiledMap.Orientation.HEX) {
+            // handle hex map
+            const TiledMap = cc.TiledMap;
+            const StaggerAxis = TiledMap.StaggerAxis;
+            const StaggerIndex = TiledMap.StaggerIndex;
+
+            let maptw = this._mapTileSize.width;
+            let mapth = this._mapTileSize.height;
             let width = 0, height = 0;
-            if (this._staggerAxis === cc.TiledMap.StaggerAxis.STAGGERAXIS_X) {
-                height = mapInfo._tileSize.height * (this._layerSize.height + 0.5);
-                width = (mapInfo._tileSize.width + this._hexSideLength) * Math.floor(this._layerSize.width / 2) + mapInfo._tileSize.width * (this._layerSize.width % 2);
+
+            this._odd_even = (this._staggerIndex === StaggerIndex.STAGGERINDEX_ODD) ? 1 : -1;
+
+            if (this._staggerAxis === StaggerAxis.STAGGERAXIS_X) {
+                this._diffX1 = (maptw - this._hexSideLength) / 2;
+                this._diffY1 = 0;
+                height = mapth * (this._layerSize.height + 0.5);
+                width = (maptw + this._hexSideLength) * Math.floor(this._layerSize.width / 2) + maptw * (this._layerSize.width % 2);
             } else {
-                width = mapInfo._tileSize.width * (this._layerSize.width + 0.5);
-                height = (mapInfo._tileSize.height + this._hexSideLength) * Math.floor(this._layerSize.height / 2) + mapInfo._tileSize.height * (this._layerSize.height % 2);
+                this._diffX1 = 0;
+                this._diffY1 = (mapth - this._hexSideLength) / 2;
+                width = maptw * (this._layerSize.width + 0.5);
+                height = (mapth + this._hexSideLength) * Math.floor(this._layerSize.height / 2) + mapth * (this._layerSize.height % 2);
             }
             this.node.setContentSize(width, height);
         } else {
             this.node.setContentSize(this._layerSize.width * this._mapTileSize.width,
                 this._layerSize.height * this._mapTileSize.height);
         }
+
+        // offset (after layer orientation is set);
+        this._offset = this._calculateLayerOffset(layerInfo.offset);
+
         this._useAutomaticVertexZ = false;
         this._vertexZvalue = 0;
+        this._setVerticesDirty();
     },
 
     _calculateLayerOffset (pos) {
