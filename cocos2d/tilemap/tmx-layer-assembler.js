@@ -38,6 +38,8 @@ const maxGridsLimit = parseInt(65535 / 4);
 
 import { mat4 } from '../core/vmath';
 
+const RenderFlow = require('../core/renderer/webgl/render-flow');
+
 let _mat4_temp = mat4.create();
 let _leftDown = {row:0, col:0};
 
@@ -61,6 +63,7 @@ let RenderDataList = cc.Class({
     _pushRenderData () {
         let renderData = new IARenderData();
         renderData.ia = new InputAssembler();
+        renderData.nodesRenderList = [];
         this._dataList.push(renderData);
     },
 
@@ -69,6 +72,7 @@ let RenderDataList = cc.Class({
             this._pushRenderData();
         }
         let renderData = this._dataList[this._offset];
+        renderData.nodesRenderList.length = 0;
         let ia = renderData.ia;
         ia._vertexBuffer = vb;
         ia._indexBuffer = ib;
@@ -96,7 +100,7 @@ let tmxAssembler = {
         if (vertices.length === 0 ) return;
 
         let buffer = comp._buffer;
-        if (comp._isClipDirty()) {
+        if (comp._isClipDirty() || comp._isUserNodeDirty()) {
             buffer.reset();
 
             let leftDown, rightTop;
@@ -133,12 +137,27 @@ let tmxAssembler = {
                     break;
             }
             comp._setClipDirty(false);
+            comp._setUserNodeDirty(false);
         } else {
             let renderDataList = comp._renderDataList;
             let renderData = null;
+            let nodesRenderList = null;
+            let nodesList = null;
             for (let i = 0; i < renderDataList._offset; i++) {
                 renderData = renderDataList._dataList[i];
-                renderer._flushIA(renderData);
+                if (renderData.ia._count > 0) {
+                    renderer._flushIA(renderData);
+                }
+                nodesRenderList = renderData.nodesRenderList;
+                for (let j = 0; j < nodesRenderList.length; j++) {
+                    nodesList = nodesRenderList[j];
+                    if (!nodesList) continue;
+                    for (let idx = 0; idx < nodesList.length; idx++) {
+                        node = nodesList[idx];
+                        if (!node) continue;
+                        RenderFlow.visitRootNode(node);
+                    }
+                }
             }
         }
     },
@@ -164,6 +183,50 @@ let tmxAssembler = {
         let renderDataList = comp._renderDataList;
         renderDataList.reset();
         let renderData = renderDataList.popRenderData(buffer._vb, buffer._ib, 0, 0);
+        let ia = renderData.ia;
+        let colNodesCount = 0, checkColRange = true;
+
+        let flush = function () {
+            if (ia._count === 0) {
+                return;
+            }
+
+            buffer.uploadData();
+            renderer._flushIA(renderData);
+
+            let needSwitchBuffer = fillGrids >= maxGridsLimit;
+            if (needSwitchBuffer) {
+                buffer.switchBuffer();
+                renderData = renderDataList.popRenderData(buffer._vb, buffer._ib, 0, 0);
+                ia = renderData.ia;
+                vfOffset = 0;
+                fillGrids = 0;
+            } else {
+                renderData = renderDataList.popRenderData(buffer._vb, buffer._ib, buffer.indiceOffset, 0);
+                ia = renderData.ia;
+            }
+        }
+
+        let renderNodes = function (nodeRow, nodeCol) {
+            let nodesInfo = comp._getNodesByRowCol(nodeRow, nodeCol);
+            if (!nodesInfo || nodesInfo.count == 0) return;
+            let nodesList = nodesInfo.list;
+            let newIdx = 0, oldIdx = 0;
+            renderData.nodesRenderList.push(nodesList);
+            flush();
+            for (; newIdx < nodesInfo.count; ) {
+                node = nodesList[oldIdx];
+                oldIdx++;
+                if (!node) continue;
+                RenderFlow.visitRootNode(node);
+                if (newIdx !== oldIdx) {
+                    nodesList[newIdx] = node;
+                    node._index_ = newIdx;
+                }
+                newIdx++;
+            }
+            nodesList.length = newIdx;
+        }
 
         if (rowMoveDir == -1) {
             row = rightTop.row;
@@ -176,30 +239,34 @@ let tmxAssembler = {
         // traverse row
         for (; ; row += rowMoveDir) {
             rowData = vertices[row];
-            if (!rowData) continue;
+            colNodesCount = comp._getNodesCountByRow(row) ;
+            checkColRange = colNodesCount == 0 && rowData;
 
             // limit min col and max col
             if (colMoveDir == 1) {
-                col = leftDown.col < rowData.minCol ? rowData.minCol : leftDown.col;
-                cols = rightTop.col > rowData.maxCol ? rowData.maxCol : rightTop.col;
+                col = checkColRange && leftDown.col < rowData.minCol ? rowData.minCol : leftDown.col;
+                cols = checkColRange && rightTop.col > rowData.maxCol ? rowData.maxCol : rightTop.col;
             } else {
-                col = rightTop.col > rowData.maxCol ? rowData.maxCol : rightTop.col;
-                cols = leftDown.col < rowData.minCol ? rowData.minCol : leftDown.col;
+                col = checkColRange && rightTop.col > rowData.maxCol ? rowData.maxCol : rightTop.col;
+                cols = checkColRange && leftDown.col < rowData.minCol ? rowData.minCol : leftDown.col;
             }
             
             // traverse col
             for (; ; col += colMoveDir) {
-                colData = rowData[col];
-                if (!colData) continue;
+                colData = rowData && rowData[col];
+                if (!colData) {
+                    // only render users nodes because map data is empty
+                    if (colNodesCount > 0) renderNodes(row, col);
+                    continue;
+                }
+
                 grid = colData.grid;
 
                 // check init or new material
                 if (curTexIdx !== grid.texId) {
                     // need flush
-                    if (curTexIdx !== -1 && ia._count > 0) {
-                        buffer.uploadData();
-                        renderer._flushIA(renderData);
-                        renderData = renderDataList.popRenderData(buffer._vb, buffer._ib, buffer.indiceOffset, 0);
+                    if (curTexIdx !== -1) {
+                        flush();
                     }
                     // update material
                     curTexIdx = grid.texId;
@@ -270,16 +337,14 @@ let tmxAssembler = {
                 ia._count += 6;
                 fillGrids++;
 
+                // check render users node
+                if (colNodesCount > 0) renderNodes(row, col);
+
                 // vertices count exceed 66635, buffer must be switched
                 if (fillGrids >= maxGridsLimit) {
-                    buffer.uploadData();
-                    renderer._flushIA(renderData);
-
-                    buffer.switchBuffer();
-                    renderData = renderDataList.popRenderData(buffer._vb, buffer._ib, 0, 0);
-                    vfOffset = 0;
-                    fillGrids = 0;
+                    flush();
                 }
+
                 // end
                 if (col == cols) break;
             }

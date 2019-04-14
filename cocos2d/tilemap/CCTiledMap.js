@@ -26,10 +26,7 @@
 
 require('./CCTMXXMLParser');
 require('./CCTiledMapAsset');
-require('./CCTiledBase');
-require('./CCTiledLayerMgr');
 require('./CCTiledLayer');
-require('./CCTiledNode');
 require('./CCTiledTile');
 require('./CCTiledObjectGroup');
 
@@ -567,7 +564,7 @@ let TiledMap = cc.Class({
                         group = child.addComponent(cc.TiledObjectGroup);
                     }
 
-                    group._init(layerInfo, mapInfo);
+                    group._init(layerInfo, mapInfo, texGrids);
                     groups.push(group);
                 }
             }

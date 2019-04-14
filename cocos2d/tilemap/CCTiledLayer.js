@@ -102,11 +102,10 @@ let TiledLayer = cc.Class({
     },
 
     ctor () {
-        // node render mode pool
-        this._nodePool = [];
-        // using to renderer node, contain 'tiledNode'
-        this._renderNode = [];
-        this._nodeCount = 0;
+        this._userNodeGrid = {};// [row][col] = [node0, node1];
+        this._userNodeMap = {};// [id] = node;
+        this._userNodeId = 1;
+        this._userNodeDirty = false;
 
         // store the layer tiles node, index is caculated by 'x + width * y', format likes '[0]=tileNode0,[1]=tileNode1, ...'
         this._tiledTiles = [];
@@ -155,11 +154,185 @@ let TiledLayer = cc.Class({
         this._clipHandleNode = null;
     },
 
+    /**
+     * !#en Inserts user's node into layer.
+     * !#zh 插入。
+     * @method getLayerName
+     * @return {String}
+     * @example
+     * let layerName = tiledLayer.getLayerName();
+     * cc.log(layerName);
+     */
+    insertUserNode (node) {
+        let nodeId = node._nodeId_;
+        if (nodeId) {
+            cc.warn("CCTiledLayer:insertUserNode node has insert");
+            return;
+        }
+        node._nodeId_ = this._userNodeId;
+        node._row_ = -1;
+        node._col_ = -1;
+        node._tiledLayer_ = this;
+        this._userNodeMap[node._nodeId_] = node;
+
+        let tempRowCol = this._tempRowCol;
+        this._positionToRowCol(node.x, node.y, tempRowCol);
+        this._addUserNodeToGrid(node, tempRowCol);
+        this._updateClipOffsetByUserNode(node);
+        node.on(cc.Node.EventType.POSITION_CHANGED, this._userNodePosChange, node);
+        node.on(cc.Node.EventType.SIZE_CHANGED, this._userNodeSizeChange, node);
+        this._userNodeId++;
+        // nodeId is too large
+        if (this._userNodeId >= Number.MAX_SAFE_INTEGER) {
+            this._updateAllUserNode();
+        }
+    },
+
+    removeUserNode (node) {
+        let nodeId = node._nodeId_;
+        if (!nodeId) {
+            cc.warn("CCTiledLayer:removeUserNode node is not exist");
+            return;
+        }
+        node.off(cc.Node.EventType.POSITION_CHANGED, this._userNodePosChange, node);
+        node.off(cc.Node.EventType.SIZE_CHANGED, this._userNodeSizeChange, node);
+        this._removeUserNodeFromGrid(node);
+        if (nodeId) {
+            delete this._userNodeMap[nodeId];
+        }
+        node._index_ = null;
+        node._row_ = null;
+        node._col_ = null;
+        node._nodeId_ = null;
+    },
+
+    destroyUserNode (node) {
+        this.removeUserNode(node);
+        node.destroy();
+    },
+
+    _getNodesByRowCol (row, col) {
+        let rowData = this._userNodeGrid[row];
+        if (!rowData) return null;
+        return rowData[col];
+    },
+
+    _getNodesCountByRow (row) {
+        let rowData = this._userNodeGrid[row];
+        if (!rowData) return 0;
+        return rowData.count;
+    },
+
+    _updateAllUserNode () {
+        let oldUserNodeMap = this._userNodeMap;
+        this._userNodeGrid = {};
+        let newUserNodeMap = this._userNodeMap = {};
+        this._userNodeId = 1;
+        for (let nodeId in oldUserNodeMap) {
+            let node = oldUserNodeMap[nodeId];
+            node._nodeId_ = this._userNodeId;
+            this._userNodeId ++;
+            newUserNodeMap[node._nodeId_] = node;
+
+            let tempRowCol = this._tempRowCol;
+            this._positionToRowCol(node.x, node.y, tempRowCol);
+            this._addUserNodeToGrid(node, tempRowCol);
+            this._updateClipOffsetByUserNode(node);
+        }
+    },
+
+    _updateClipOffsetByUserNode (node) {
+        if (this._topOffset < node.height) {
+            this._topOffset = node.height;
+        }
+        if (this._downOffset > -node.height) {
+            this._downOffset = -node.height;
+        }
+        if (this._leftOffset > -node.width) {
+            this._leftOffset = -node.width;
+        }
+        if (this._rightOffset < node.width) {
+            this._rightOffset = node.width;
+        }
+    },
+
+    _userNodeSizeChange () {
+        let node = this;
+        let self = node._tiledLayer_;
+        self._updateClipOffsetByUserNode(node);
+    },
+
+    _userNodePosChange () {
+        let node = this;
+        let self = node._tiledLayer_;
+        let tempRowCol = this._tempRowCol;
+        self._positionToRowCol(node.x, node.y, tempRowCol);
+        // users pos not change
+        if (tempRowCol.row === node._row_ && tempRowCol.col === node._col_) return;
+
+        self._removeUserNodeFromGrid(node);
+        self._addUserNodeToGrid(node, tempRowCol);
+    },
+
+    _removeUserNodeFromGrid (node) {
+        let nodeId = node._nodeId_;
+        if (!nodeId) return;
+        let row = node._row_;
+        let col = node._col_;
+        let index = node._index_;
+
+        let rowData = this._userNodeGrid[row];
+        let colData = rowData && rowData[col];
+        if (colData) {
+            rowData.count --;
+            colData.count --;
+            colData.list[index] = null;
+            if (colData.count <= 0) {
+                colData.list.length = 0;
+                colData.count = 0;
+            }
+        }
+
+        node._row_ = -1;
+        node._col_ = -1;
+        node._index_ = -1;
+    },
+
+    _isInLayer (row, col) {
+        return row >= 0 && col >= 0 && row <= this._rightTop.row && col <= this._rightTop.col;
+    },
+
+    _addUserNodeToGrid (node, tempRowCol) {
+        let row = tempRowCol.row;
+        let col = tempRowCol.col;
+        if (this._isInLayer(row, col)) {
+            let rowData = this._userNodeGrid[row] = this._userNodeGrid[row] || {count : 0};
+            let colData = rowData[col] = rowData[col] || {count : 0, list: []};
+            node._row_ = row;
+            node._col_ = col;
+            node._index_ = colData.list.length;
+            rowData.count++;
+            colData.count++;
+            colData.list.push(node);
+        } else {
+            node._row_ = -1;
+            node._col_ = -1;
+            node._index_ = -1;
+        }
+        this._userNodeDirty = true;
+    },
+
+    _isUserNodeDirty () {
+        return this._userNodeDirty;
+    },
+
+    _setUserNodeDirty (value) {
+        this._userNodeDirty = value;
+    },
+
     onEnable () {
         this._super();
-        if (this.isBatchMode()) {
-            this._activateMaterial();
-        }
+        this._activateMaterial();
     },
 
     onDestroy () {
@@ -168,6 +341,10 @@ let TiledLayer = cc.Class({
             this._buffer.destroy();
             this._buffer = null;
         }
+    },
+
+    __preload () {
+        this._debugClip = false;
     },
 
     /**
@@ -500,6 +677,9 @@ let TiledLayer = cc.Class({
 
         // calc left down
         this._positionToRowCol(leftDownX, leftDownY, tempRowCol);
+        tempRowCol.row = tempRowCol.row > 0 ? tempRowCol.row : 0;
+        tempRowCol.col = tempRowCol.col > 0 ? tempRowCol.col : 0;
+
         // make range large
         if (tempRowCol.row >= 1) tempRowCol.row--;
         if (tempRowCol.col >= 1) tempRowCol.col--;
@@ -511,6 +691,9 @@ let TiledLayer = cc.Class({
 
         // calc right top
         this._positionToRowCol(rightTopX, rightTopY, tempRowCol);
+        tempRowCol.row = tempRowCol.row > 0 ? tempRowCol.row : 0;
+        tempRowCol.col = tempRowCol.col > 0 ? tempRowCol.col : 0;
+
         // make range large
         tempRowCol.row++;
         tempRowCol.col++;
@@ -564,24 +747,20 @@ let TiledLayer = cc.Class({
                 }
                 break;
         }
-        result.row = row > 0 ? row : 0;
-        result.col = col > 0 ? col : 0;
         return result;
     },
 
     update () {
-        if (this._clipHandleNode) {
-            this._updateViewPort(this._clipHandleNode.x, this._clipHandleNode.y, this._clipHandleNode.width, this._clipHandleNode.height);
-        } else if (this.enableClip) {
-            this.node._updateWorldMatrix();
-            mat4.invert(_mat4_temp, this.node._worldMatrix);
-            let rect = cc.visibleRect;
-            vec2.transformMat4(_vec2_temp, _vec2_temp, _mat4_temp);
-            this._updateViewPort(_vec2_temp.x, _vec2_temp.y, rect.width, rect.height);
-        }
-
-        if (!this.isBatchMode()) {
-            this._updateNode();
+        if (this.enableClip) {
+            if (this._clipHandleNode) {
+                this._updateViewPort(this._clipHandleNode.x, this._clipHandleNode.y, this._clipHandleNode.width, this._clipHandleNode.height);
+            } else {
+                this.node._updateWorldMatrix();
+                mat4.invert(_mat4_temp, this.node._worldMatrix);
+                let rect = cc.visibleRect;
+                vec2.transformMat4(_vec2_temp, _vec2_temp, _mat4_temp);
+                this._updateViewPort(_vec2_temp.x, _vec2_temp.y, rect.width, rect.height);
+            }
         }
     },
 
@@ -653,6 +832,11 @@ let TiledLayer = cc.Class({
         let clipCol = 0, clipRow = 0;
         let tileOffset = null;
         let flippedX = false, flippedY = false, tempVal;
+
+        this._topOffset = 0;
+        this._downOffset = 0;
+        this._leftOffset = 0;
+        this._rightOffset = 0;
 
         for (let row = 0; row < rows; ++row) {
             for (let col = 0; col < cols; ++col) {
@@ -760,22 +944,25 @@ let TiledLayer = cc.Class({
                 colData.b = grid.b;
                 colData.t = grid.t;
 
-                // Rotation and Flip
-                if (gid > TileFlag.DIAGONAL) {
-                    flippedX = (gid & TileFlag.HORIZONTAL) >>> 0;
-                    flippedY = (gid & TileFlag.VERTICAL) >>> 0;
-        
-                    if (flippedX) {
-                        tempVal = colData.r;
-                        colData.r = colData.l;
-                        colData.l = tempVal;
-                    }
-        
-                    if (flippedY) {
-                        tempVal = colData.b;
-                        colData.b = colData.t;
-                        colData.t = tempVal;
-                    }
+                // rotation
+                if ((gid & TileFlag.DIAGONAL) >>> 0) {
+                    tempVal = colData.r;
+                    colData.r = colData.b;
+                    colData.b = tempVal;
+                }
+
+                // flip x
+                if ((gid & TileFlag.HORIZONTAL) >>> 0) {
+                    tempVal = colData.r;
+                    colData.r = colData.l;
+                    colData.l = tempVal;
+                }
+
+                // flip y
+                if ((gid & TileFlag.HORIZONTAL) >>> 0) {
+                    tempVal = colData.b;
+                    colData.b = colData.t;
+                    colData.t = tempVal;
                 }
             }
             colOffset += cols;
@@ -897,11 +1084,7 @@ let TiledLayer = cc.Class({
      */
     setTextures (textures) {
         this._textures = textures;
-        if (this.isBatchMode()) {
-            this._activateMaterial();
-        } else {
-            this._updateNode();
-        }
+        this._activateMaterial();
     },
 
     /**
@@ -986,9 +1169,7 @@ let TiledLayer = cc.Class({
                 if (!tilesetInfo) continue;
                 cc.TiledMap.fillTextureGrids(tilesetInfo, texGrids, i);
             }
-            this._updateVertices();
-            this._traverseAllGrid();
-            this._activateMaterial();
+            this._prepareToRender();
         }.bind(this));
     },
 
@@ -1104,212 +1285,11 @@ let TiledLayer = cc.Class({
         return ret;
     },
 
-    isBatchMode () {
-        return CC_EDITOR || this._tiledType === TiledType.TILED_BATCH;
-    },
-
     _prepareToRender () {
-        if (this.isBatchMode()) {
-            this._updateVertices();
-            this._traverseAllGrid();
-            this._activateMaterial();
-        } else {
-            this._updateNode();
-        }
-    },
-
-    _clearNode () {
-        for (let i = 0; i < this._using.length; i++) {
-            let node = this._using[i];
-            node.x = -9999999;
-            node.y = -9999999;
-            this._pool.push(node);
-        }
-        this._using.length = 0;
-    },
-
-    _updateNode () {
-        if (!this._isClipDirty()) return;
-        this._nodeCount = 0;
-
-        let vertices = this._vertices;
-        if (vertices.length === 0 ) return;
-
-        let leftDown = this._clipRect.leftDown;
-        let rightTop = this._clipRect.rightTop;
-
-        const Orientation = cc.TiledMap.Orientation;
-
-        switch (this._layerOrientation) {
-            // left top to right down
-            case Orientation.ORTHO:
-                this.traverseGrids(leftDown, rightTop, -1, 1);
-                break;
-            // right top to left down
-            case Orientation.ISO:
-                this.traverseGrids(leftDown, rightTop, -1, -1);
-                break;
-            // left top to right down
-            case Orientation.HEX:
-                this.traverseGrids(leftDown, rightTop, -1, 1);
-                break;
-        }
-        this._setClipDirty(false);
-        
-
-
-        let tiles = this._tiles;
-        let texGrids = this._texGrids;
-
-        for (let i = 0, n = tiles.length; i < n; i ++) {
-            let gid = tiles[i];
-            let grid = texGrids[gid];
-            if (!grid) continue;
-            let node = this._pool.pop();
-            if (!node) {
-                node = new cc.PrivateNode();
-                node.parent = this.node;
-            }
-            let sprite = node.getComponent(cc.Sprite);
-            if (!sprite) {
-                sprite = node.addComponent(cc.Sprite);
-            }
-            let spFrame = sprite.spriteFrame;
-            if (!spFrame) {
-                spFrame = sprite.spriteFrame = new cc.SpriteFrame;
-            }
-            let tex = this._textures[grid.texId];
-            spFrame.setTexture(tex, grid);
-            node.setContentSize(grid.width, grid.height);
-            // to set position
-            this._using.push(node);
-        }
-    },
-
-    // rowMoveDir is -1 or 1, -1 means decrease, 1 means increase
-    // colMoveDir is -1 or 1, -1 means decrease, 1 means increase
-    traverseGrids (leftDown, rightTop, rowMoveDir, colMoveDir) {
-        let color = this.node.color;
-        let tiledTiles = this._tiledTiles;
-
-        let vertices = this._vertices;
-        let rowData, col, cols, row, rows, colData, tileSize, grid = null;
-        let fillGrids = 0;
-        let left = 0, bottom = 0, right = 0, top = 0; // x, y
-        let tiledNode = null;
-        let ul, ur, vt, vb;// u, v
-
-        if (rowMoveDir == -1) {
-            row = rightTop.row;
-            rows = leftDown.row;
-        } else {
-            row = leftDown.row;
-            rows = rightTop.row;
-        }
-
-        // traverse row
-        for (; ; row += rowMoveDir) {
-            rowData = vertices[row];
-            if (!rowData) continue;
-
-            // limit min col and max col
-            if (colMoveDir == 1) {
-                col = leftDown.col < rowData.minCol ? rowData.minCol : leftDown.col;
-                cols = rightTop.col > rowData.maxCol ? rowData.maxCol : rightTop.col;
-            } else {
-                col = rightTop.col > rowData.maxCol ? rowData.maxCol : rightTop.col;
-                cols = leftDown.col < rowData.minCol ? rowData.minCol : leftDown.col;
-            }
-            
-            // traverse col
-            for (; ; col += colMoveDir) {
-                colData = rowData[col];
-                if (!colData) continue;
-                grid = colData.grid;
-
-                // calc rect vertex
-                left = colData.left;
-                bottom = colData.bottom;
-                tileSize = grid.tileset._tileSize;
-                right = left + tileSize.width;
-                top = bottom + tileSize.height;
-
-                // begin to fill vertex buffer
-                tiledNode = tiledTiles[colData.index];
-                if (!tiledNode) {
-                    // tl
-                    vbuf[vfOffset].x = left;
-                    vbuf[vfOffset+1].y = top;
-
-                    // bl
-                    vbuf[vfOffset+5].x = left;
-                    vbuf[vfOffset+6].y = bottom;
-
-                    // tr
-                    vbuf[vfOffset+10].x = right;
-                    vbuf[vfOffset+11].y = top;
-
-                    // br
-                    vbuf[vfOffset+15].x = right;
-                    vbuf[vfOffset+16].y = bottom;
-                } else {
-                    this.fillByTiledNode(tiledNode, vbuf, vfOffset, left, right, top, bottom);
-                }
-
-                // calc rect uv
-                ul = colData.l;
-                ur = colData.r;
-                vt = colData.t;
-                vb = colData.b;
-
-                // tl
-                vbuf[vfOffset+2].u = ul;
-                vbuf[vfOffset+3].v = vt;
-                uintbuf[vfOffset+4].color = color;
-
-                // bl
-                vbuf[vfOffset+7].u = ul;
-                vbuf[vfOffset+8].v = vb;
-                uintbuf[vfOffset+9].color = color;
-
-                // tr
-                vbuf[vfOffset+12].u = ur;
-                vbuf[vfOffset+13].v = vt;
-                uintbuf[vfOffset+14].color = color;
-
-                // br
-                vbuf[vfOffset+17].u = ur;
-                vbuf[vfOffset+18].v = vb;
-                uintbuf[vfOffset+19].color = color;
-
-                // modify buffer all kinds of offset
-                vfOffset += 20;
-                buffer.adjust(4, 6);
-                ia._count += 6;
-                fillGrids++;
-
-                // vertices count exceed 66635, buffer must be switched
-                if (fillGrids >= maxGridsLimit) {
-                    buffer.uploadData();
-                    renderer._flushIA(renderData);
-
-                    buffer.switchBuffer();
-                    renderData = renderDataList.popRenderData(buffer._vb, buffer._ib, 0, 0);
-                    vfOffset = 0;
-                    fillGrids = 0;
-                }
-                // end
-                if (col == cols) break;
-            }
-            // end
-            if (row == rows) break;
-        }
-
-        // last flush
-        if (ia._count > 0) {
-            buffer.uploadData();
-            renderer._flushIA(renderData);
-        }
+        this._updateVertices();
+        this._traverseAllGrid();
+        this._updateAllUserNode();
+        this._activateMaterial();
     },
 
     _activateMaterial () {

@@ -119,7 +119,12 @@ let TiledObjectGroup = cc.Class({
         
     },
 
-    _init (groupInfo, mapInfo) {
+    _init (groupInfo, mapInfo, texGrids) {
+        const TiledMap = cc.TiledMap;
+        const TMXObjectType = TiledMap.TMXObjectType;
+        const Orientation = TiledMap.Orientation;
+        const StaggerAxis = TiledMap.StaggerAxis;
+
         this._groupName = groupInfo.name;
         this._positionOffset = groupInfo.offset;
         this._mapInfo = mapInfo;
@@ -128,8 +133,8 @@ let TiledObjectGroup = cc.Class({
         let mapSize = mapInfo._mapSize;
         let tileSize = mapInfo._tileSize;
         let width = 0, height = 0;
-        if (mapInfo.orientation === cc.TiledMap.Orientation.HEX) {
-            if (mapInfo.getStaggerAxis() === cc.TiledMap.StaggerAxis.STAGGERAXIS_X) {
+        if (mapInfo.orientation === Orientation.HEX) {
+            if (mapInfo.getStaggerAxis() === StaggerAxis.STAGGERAXIS_X) {
                 height = tileSize.height * (mapSize.height + 0.5);
                 width = (tileSize.width + mapInfo.getHexSideLength()) * Math.floor(mapSize.width / 2) + tileSize.width * (mapSize.width % 2);
             } else {
@@ -145,13 +150,16 @@ let TiledObjectGroup = cc.Class({
         let objects = groupInfo._objects;
         for (let i = 0, l = objects.length; i < l; i++) {
             let object = objects[i];
+            let objType = object.type;
             object.offset = cc.v2(object.x, object.y);
 
-            let imageGID = object.gid;
-            if (imageGID) {
-                this._addImage(imageGID);
+            if (objType === TMXObjectType.IMAGE) {
+                let imageGID = object.gid;
+                if (imageGID) {
+                    this._addImage(imageGID);
+                }
             }
-
+            
             let points = object.points || object.polylinePoints;
             if (points) {
                 for (let pi = 0; pi < points.length; pi++) {
@@ -159,7 +167,8 @@ let TiledObjectGroup = cc.Class({
                 }
             }
 
-            if (cc.TiledMap.Orientation.ISO !== mapInfo.orientation) {
+            if (Orientation.ISO !== mapInfo.orientation) {
+                object.x = Number(object.x);
                 object.y = height - object.y;
             } else {
                 let posIdxX = object.x / tileSize.width * 2;

@@ -184,24 +184,29 @@ function init (node) {
 
 RenderFlow.flows = flows;
 RenderFlow.createFlow = createFlow;
-RenderFlow.visit = function (scene) {
-    _batcher.reset();
-    _batcher.walking = true;
 
-    _cullingMask = 1 << scene.groupIndex;
+RenderFlow.visitRootNode = function (rootNode) {
+    _cullingMask = 1 << rootNode.groupIndex;
 
-    if (scene._renderFlag & WORLD_TRANSFORM) {
+    if (rootNode._renderFlag & WORLD_TRANSFORM) {
         _batcher.worldMatDirty ++;
-        scene._calculWorldMatrix();
-        scene._renderFlag &= ~WORLD_TRANSFORM;
+        rootNode._calculWorldMatrix();
+        rootNode._renderFlag &= ~WORLD_TRANSFORM;
 
-        flows[scene._renderFlag]._func(scene);
+        flows[rootNode._renderFlag]._func(rootNode);
 
         _batcher.worldMatDirty --;
     }
     else {
-        flows[scene._renderFlag]._func(scene);
+        flows[rootNode._renderFlag]._func(rootNode);
     }
+};
+
+RenderFlow.visit = function (scene) {
+    _batcher.reset();
+    _batcher.walking = true;
+
+    RenderFlow.visitRootNode(scene);
 
     _batcher.terminate();
     _batcher.walking = false;
