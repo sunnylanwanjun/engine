@@ -43,9 +43,9 @@ let TiledLayer = cc.Class({
     // because TiledLayer not create or maintains the sgNode by itself.
     extends: RenderComponent,
 
-    editor: {
-        inspector: 'packages://inspector/inspectors/comps/tiled-layer.js',
-    },
+    // editor: {
+    //     inspector: 'packages://inspector/inspectors/comps/tiled-layer.js',
+    // },
 
     properties: {
         _debugClip:{
@@ -610,7 +610,9 @@ let TiledLayer = cc.Class({
         if (!this._clipHandleNode) {
             this._clipHandleNode = new cc.Node();
             this._clipHandleNode.name = 'TESTCLIP';
-            this._clipHandleNode.parent = this;
+            this._clipHandleNode.parent = this.node;
+            this._clipHandleNode.anchorX = 0;
+            this._clipHandleNode.anchorY = 0;
             this._clipHandleNode.width = 300;
             this._clipHandleNode.height = 300;
         }
@@ -649,13 +651,11 @@ let TiledLayer = cc.Class({
 
         let vpx = this._viewPort.x - this._offset.x;
         let vpy = this._viewPort.y - this._offset.y;
-        let halfW = width * 0.5;
-        let halfH = height * 0.5;
 
-        let leftDownX = vpx - halfW + this._leftOffset;
-        let leftDownY = vpy - halfH + this._downOffset;
-        let rightTopX = vpx + halfW + this._rightOffset;
-        let rightTopY = vpy + halfH + this._topOffset;
+        let leftDownX = vpx + this._leftOffset;
+        let leftDownY = vpy + this._downOffset;
+        let rightTopX = vpx + width + this._rightOffset;
+        let rightTopY = vpy + height + this._topOffset;
 
         if (leftDownX < 0) leftDownX = 0;
         if (leftDownY < 0) leftDownY = 0;
@@ -738,20 +738,25 @@ let TiledLayer = cc.Class({
                 }
                 break;
         }
+        result.row = row;
+        result.col = col;
         return result;
     },
 
     update () {
-        if (this._enableClip) {
+        if (CC_EDITOR) {
             if (this._clipHandleNode) {
                 this._updateViewPort(this._clipHandleNode.x, this._clipHandleNode.y, this._clipHandleNode.width, this._clipHandleNode.height);
+                this.enableClip(true);
             } else {
-                this.node._updateWorldMatrix();
-                mat4.invert(_mat4_temp, this.node._worldMatrix);
-                let rect = cc.visibleRect;
-                vec2.transformMat4(_vec2_temp, _vec2_temp, _mat4_temp);
-                this._updateViewPort(_vec2_temp.x, _vec2_temp.y, rect.width, rect.height);
+                this.enableClip(false);
             }
+        } else if (this._enableClip) {
+            this.node._updateWorldMatrix();
+            mat4.invert(_mat4_temp, this.node._worldMatrix);
+            let rect = cc.visibleRect;
+            vec2.transformMat4(_vec2_temp, _vec2_temp, _mat4_temp);
+            this._updateViewPort(_vec2_temp.x, _vec2_temp.y, rect.width, rect.height);
         }
     },
 
@@ -794,7 +799,7 @@ let TiledLayer = cc.Class({
         let layerOrientation = this._layerOrientation,
             tiles = this._tiles;
 
-        if (!tiles || !this._tileset) {
+        if (!tiles) {
             return;
         }
 
@@ -810,7 +815,7 @@ let TiledLayer = cc.Class({
             cols = this._layerSize.width,
             grids = this._texGrids;
         
-        let colOffset, gid, grid, left, bottom,
+        let colOffset = 0, gid, grid, left, bottom,
             axis, diffX1, diffY1, odd_even, diffX2, diffY2;
 
         if (layerOrientation === Orientation.HEX) {
@@ -877,11 +882,11 @@ let TiledLayer = cc.Class({
                 let colData = rowData[clipCol] = rowData[clipCol] || {};
                 
                 // record each row range, it will faster when clip grid
-                if (rowData.minCol < clipCol) {
+                if (rowData.minCol > clipCol) {
                     rowData.minCol = clipCol;
                 }
 
-                if (rowData.maxCol > clipCol) {
+                if (rowData.maxCol < clipCol) {
                     rowData.maxCol = clipCol;
                 }
 
@@ -933,12 +938,6 @@ let TiledLayer = cc.Class({
             colOffset += cols;
         }
         this._verticesDirty = false;
-    },
-
-    // px, py is center pos of parent
-    _adjustLayerPos (cx, cy) {
-        this.node.x = cx - this.node.width * 0.5;
-        this.node.y = cy - this.node.height * 0.5;
     },
 
     /**

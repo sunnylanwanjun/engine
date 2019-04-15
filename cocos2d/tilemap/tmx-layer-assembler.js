@@ -25,6 +25,8 @@
 
 const TiledLayer = require('./CCTiledLayer');
 const TiledMap = require('./CCTiledMap');
+const TileFlag = TiledMap.TileFlag;
+const FLIPPED_MASK = TileFlag.FLIPPED_MASK;
 
 import IARenderData from '../renderer/render-data/ia-render-data';
 
@@ -36,11 +38,12 @@ import InputAssembler from '../renderer/core/input-assembler';
 const Orientation = TiledMap.Orientation;
 const maxGridsLimit = parseInt(65535 / 4);
 
-import { mat4 } from '../core/vmath';
+import { mat4, vec3 } from '../core/vmath';
 
-const RenderFlow = require('../core/renderer/webgl/render-flow');
+const RenderFlow = require('../core/renderer/render-flow');
 
 let _mat4_temp = mat4.create();
+let _vec3_temp = vec3.create();
 let _leftDown = {row:0, col:0};
 let _tempUV = {r:0, l:0, t:0, b:0};
 
@@ -49,8 +52,8 @@ let TiledMapBuffer = cc.Class({
     name: 'cc.TiledMapBuffer',
     extends: require('../core/renderer/webgl/quad-buffer'),
 
-    requestStatic : SpineBuffer.requestStatic,
-    adjust : SpineBuffer.adjust,
+    requestStatic : SpineBuffer.prototype.requestStatic,
+    adjust : SpineBuffer.prototype.adjust,
 });
 
 let RenderDataList = cc.Class({
@@ -101,14 +104,14 @@ let tmxAssembler = {
         if (vertices.length === 0 ) return;
 
         let buffer = comp._buffer;
-        if (comp._isClipDirty() || comp._isUserNodeDirty()) {
+        //if (comp._isClipDirty() || comp._isUserNodeDirty()) {
             buffer.reset();
 
             let leftDown, rightTop;
             if (comp._enableClip) {
-                let clipRect = comp._clipRect;
-                leftDown = clipRect.leftDown;
-                rightTop = clipRect.rightTop;
+               let clipRect = comp._clipRect;
+               leftDown = clipRect.leftDown;
+               rightTop = clipRect.rightTop;
             } else {
                 leftDown = _leftDown;
                 rightTop = comp._rightTop;
@@ -139,28 +142,28 @@ let tmxAssembler = {
             }
             comp._setClipDirty(false);
             comp._setUserNodeDirty(false);
-        } else {
-            let renderDataList = comp._renderDataList;
-            let renderData = null;
-            let nodesRenderList = null;
-            let nodesList = null;
-            for (let i = 0; i < renderDataList._offset; i++) {
-                renderData = renderDataList._dataList[i];
-                if (renderData.ia._count > 0) {
-                    renderer._flushIA(renderData);
-                }
-                nodesRenderList = renderData.nodesRenderList;
-                for (let j = 0; j < nodesRenderList.length; j++) {
-                    nodesList = nodesRenderList[j];
-                    if (!nodesList) continue;
-                    for (let idx = 0; idx < nodesList.length; idx++) {
-                        node = nodesList[idx];
-                        if (!node) continue;
-                        RenderFlow.visitRootNode(node);
-                    }
-                }
-            }
-        }
+        // } else {
+        //     let renderDataList = comp._renderDataList;
+        //     let renderData = null;
+        //     let nodesRenderList = null;
+        //     let nodesList = null;
+        //     for (let i = 0; i < renderDataList._offset; i++) {
+        //         renderData = renderDataList._dataList[i];
+        //         if (renderData.ia._count > 0) {
+        //             renderer._flushIA(renderData);
+        //         }
+        //         nodesRenderList = renderData.nodesRenderList;
+        //         for (let j = 0; j < nodesRenderList.length; j++) {
+        //             nodesList = nodesRenderList[j];
+        //             if (!nodesList) continue;
+        //             for (let idx = 0; idx < nodesList.length; idx++) {
+        //                 node = nodesList[idx];
+        //                 if (!node) continue;
+        //                 RenderFlow.visitRootNode(node);
+        //             }
+        //         }
+        //     }
+        // }
     },
 
     // rowMoveDir is -1 or 1, -1 means decrease, 1 means increase
@@ -169,12 +172,17 @@ let tmxAssembler = {
         let buffer = comp._buffer;
         let vbuf = buffer._vData;
         let uintbuf = buffer._uintVData;
-        let color = comp.node._color._val;
+        let layerNode = comp.node;
+        let color = layerNode._color._val;
         let tiledTiles = comp._tiledTiles;
         let texGrids = comp._texGrids;
         let tiles = comp._tiles;
         let texIdToMatIdx = comp._texIdToMatIndex;
         let mats = comp.sharedMaterials, material = null;
+        let anchorX = layerNode.anchorX;
+        let anchorY = layerNode.anchorY;
+        let moveX = -layerNode.width * anchorX;
+        let moveY = -layerNode.height * anchorY;
 
         let vertices = comp._vertices;
         let rowData, col, cols, row, rows, colData, tileSize,
@@ -240,11 +248,12 @@ let tmxAssembler = {
             rows = rightTop.row;
         }
 
+        rows += rowMoveDir;
         // traverse row
-        for (; ; row += rowMoveDir) {
+        for (; row != rows; row += rowMoveDir) {
             rowData = vertices[row];
-            colNodesCount = comp._getNodesCountByRow(row) ;
-            checkColRange = colNodesCount == 0 && rowData;
+            colNodesCount = comp._getNodesCountByRow(row);
+            checkColRange = (colNodesCount == 0 && rowData != undefined);
 
             // limit min col and max col
             if (colMoveDir == 1) {
@@ -254,9 +263,10 @@ let tmxAssembler = {
                 col = checkColRange && rightTop.col > rowData.maxCol ? rowData.maxCol : rightTop.col;
                 cols = checkColRange && leftDown.col < rowData.minCol ? rowData.minCol : leftDown.col;
             }
-            
+
+            cols += colMoveDir;
             // traverse col
-            for (; ; col += colMoveDir) {
+            for (; col != cols; col += colMoveDir) {
                 colData = rowData && rowData[col];
                 if (!colData) {
                     // only render users nodes because map data is empty
@@ -282,8 +292,8 @@ let tmxAssembler = {
                 if (!material) continue;
 
                 // calc rect vertex
-                left = colData.left;
-                bottom = colData.bottom;
+                left = colData.left + moveX;
+                bottom = colData.bottom + moveY;
                 tileSize = grid.tileset._tileSize;
                 right = left + tileSize.width;
                 top = bottom + tileSize.height;
@@ -292,22 +302,26 @@ let tmxAssembler = {
                 tiledNode = tiledTiles[colData.index];
                 if (!tiledNode) {
                     // tl
-                    vbuf[vfOffset].x = left;
-                    vbuf[vfOffset+1].y = top;
+                    vbuf[vfOffset] = left;
+                    vbuf[vfOffset + 1] = top;
+                    uintbuf[vfOffset + 4] = color;
 
                     // bl
-                    vbuf[vfOffset+5].x = left;
-                    vbuf[vfOffset+6].y = bottom;
+                    vbuf[vfOffset + 5] = left;
+                    vbuf[vfOffset + 6] = bottom;
+                    uintbuf[vfOffset + 9] = color;
 
                     // tr
-                    vbuf[vfOffset+10].x = right;
-                    vbuf[vfOffset+11].y = top;
+                    vbuf[vfOffset + 10] = right;
+                    vbuf[vfOffset + 11] = top;
+                    uintbuf[vfOffset + 14] = color;
 
                     // br
-                    vbuf[vfOffset+15].x = right;
-                    vbuf[vfOffset+16].y = bottom;
+                    vbuf[vfOffset + 15] = right;
+                    vbuf[vfOffset + 16] = bottom;
+                    uintbuf[vfOffset + 19] = color;
                 } else {
-                    this.fillByTiledNode(tiledNode, vbuf, vfOffset, left, right, top, bottom);
+                    this.fillByTiledNode(tiledNode.node, layerNode, vbuf, uintbuf, vfOffset, left, right, top, bottom);
                 }
 
                 TiledMap.flipTexture(_tempUV, grid, gid);
@@ -318,24 +332,20 @@ let tmxAssembler = {
                 vb = _tempUV.b;
 
                 // tl
-                vbuf[vfOffset+2].u = ul;
-                vbuf[vfOffset+3].v = vt;
-                uintbuf[vfOffset+4].color = color;
+                vbuf[vfOffset + 2] = ul;
+                vbuf[vfOffset + 3] = vt;
 
                 // bl
-                vbuf[vfOffset+7].u = ul;
-                vbuf[vfOffset+8].v = vb;
-                uintbuf[vfOffset+9].color = color;
+                vbuf[vfOffset + 7] = ul;
+                vbuf[vfOffset + 8] = vb;
 
                 // tr
-                vbuf[vfOffset+12].u = ur;
-                vbuf[vfOffset+13].v = vt;
-                uintbuf[vfOffset+14].color = color;
+                vbuf[vfOffset + 12] = ur;
+                vbuf[vfOffset + 13] = vt;
 
                 // br
-                vbuf[vfOffset+17].u = ur;
-                vbuf[vfOffset+18].v = vb;
-                uintbuf[vfOffset+19].color = color;
+                vbuf[vfOffset + 17] = ur;
+                vbuf[vfOffset + 18] = vb;
 
                 // modify buffer all kinds of offset
                 vfOffset += 20;
@@ -350,12 +360,7 @@ let tmxAssembler = {
                 if (fillGrids >= maxGridsLimit) {
                     flush();
                 }
-
-                // end
-                if (col == cols) break;
             }
-            // end
-            if (row == rows) break;
         }
 
         // last flush
@@ -365,31 +370,39 @@ let tmxAssembler = {
         }
     },
 
-    fillByTiledNode (tiledNode, vbuf, vfOffset, left, right, top, bottom) {
+    fillByTiledNode (tiledNode, layerNode, vbuf, uintbuf, vfOffset, left, right, top, bottom) {
         tiledNode._updateLocalMatrix();
         mat4.copy(_mat4_temp, tiledNode._matrix);
+        vec3.set(_vec3_temp, -left, -bottom, 0);
+        mat4.translate(_mat4_temp, _mat4_temp, _vec3_temp);
+        mat4.mul(_mat4_temp, layerNode._worldMatrix, _mat4_temp);
         let a = _mat4_temp.m00;
         let b = _mat4_temp.m01;
         let c = _mat4_temp.m04;
         let d = _mat4_temp.m05;
         let tx = _mat4_temp.m12;
         let ty = _mat4_temp.m13;
+        let color = tiledNode._color._val;
 
         // tl
-        vbuf[vfOffset].x = left * a + top * c + tx;
-        vbuf[vfOffset+1].y = left * b + top * d + ty;
+        vbuf[vfOffset] = left * a + top * c + tx;
+        vbuf[vfOffset + 1] = left * b + top * d + ty;
+        uintbuf[vfOffset + 4] = color;
 
         // bl
-        vbuf[vfOffset+5].x = left * a + bottom * c + tx;
-        vbuf[vfOffset+6].y = left * b + bottom * d + ty;
+        vbuf[vfOffset + 5] = left * a + bottom * c + tx;
+        vbuf[vfOffset + 6] = left * b + bottom * d + ty;
+        uintbuf[vfOffset + 9] = color;
 
         // tr
-        vbuf[vfOffset+10].x = right * a + top * c + tx;
-        vbuf[vfOffset+11].y = right * b + top * d + ty;
+        vbuf[vfOffset + 10] = right * a + top * c + tx;
+        vbuf[vfOffset + 11] = right * b + top * d + ty;
+        uintbuf[vfOffset + 14] = color;
 
         // br
-        vbuf[vfOffset+15].x = right * a + bottom * c + tx;
-        vbuf[vfOffset+16].y = right * b + bottom * d + ty;
+        vbuf[vfOffset + 15] = right * a + bottom * c + tx;
+        vbuf[vfOffset + 16] = right * b + bottom * d + ty;
+        uintbuf[vfOffset + 19] = color;
     }
 };
 

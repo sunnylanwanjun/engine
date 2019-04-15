@@ -450,11 +450,11 @@ let TiledMap = cc.Class({
     },
 
     onEnable () {
-        this.node.on(cc.Node.EventType.ANCHOR_CHANGED, this._adjustLayerPos, this);
+        this.node.on(cc.Node.EventType.ANCHOR_CHANGED, this._syncAnchorPoint, this);
     },
 
     onDisable () {
-        this.node.off(cc.Node.EventType.ANCHOR_CHANGED, this._adjustLayerPos, this);
+        this.node.off(cc.Node.EventType.ANCHOR_CHANGED, this._syncAnchorPoint, this);
     },
 
     _applyFile () {
@@ -510,15 +510,10 @@ let TiledMap = cc.Class({
         groups.length = 0;
     },
 
-    _adjustLayerPos () {
+    _syncAnchorPoint () {
         let anchor = this.node.getAnchorPoint();
-        let nx = this.node.width * (0.5 - anchor.x);
-        let ny = this.node.height * (0.5 - anchor.y);
         for (let i = 0, l = this._layers.length; i < l; i++) {
-            let layerNode = this._layers[i].node;
-            if (layerNode) {
-                layerNode._adjustLayerPos(nx, ny);
-            }
+            this._layers[i].node.setAnchorPoint(anchor);
         }
     },
 
@@ -614,6 +609,7 @@ let TiledMap = cc.Class({
         this._tileProperties = mapInfo.getTileProperties();
         this._imageLayers = mapInfo.getImageLayers();
         this._animations = mapInfo.getTileAnimations();
+        this._tilesets = mapInfo.getTilesets();
 
         let tilesets = this._tilesets;
         this._textures.length = 0;
@@ -772,7 +768,6 @@ cc.TiledMap.fillTextureGrids = function (tileset, texGrids, texId) {
             texId: texId, 
             // record belong to which tileset
             tileset: tileset,
-            spriteFrame: null,
             x: 0, y: 0, width: tw, height: th,
             t: 0, l: 0, r: 0, b: 0,
             gid: gid,
