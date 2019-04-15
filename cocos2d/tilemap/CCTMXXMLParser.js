@@ -92,6 +92,21 @@ cc.TMXLayerInfo.prototype = {
 };
 
 /**
+ * cc.TMXImageLayerInfo contains the information about the image layers.
+ * This information is obtained from the TMX file.
+ * @class TMXImageLayerInfo
+ */
+cc.TMXImageLayerInfo = function () {
+    this.name= "";
+    this.width = 0;
+    this.height = 0;
+    this.offset = cc.v2(0,0);
+    this._opacity = 0;
+    this._trans = new cc.Color(255, 255, 255, 255);
+    this.sourceImage = null;
+};
+
+/**
  * <p>cc.TMXObjectGroupInfo contains the information about the object group like: <br />
  * - group name<br />
  * - group size <br />
@@ -191,6 +206,46 @@ cc.TMXTilesetInfo.prototype = {
     }
 };
 
+function strToHAlign (value) {
+    const hAlign = cc.Label.HorizontalAlign;
+    switch (value) {
+        case 'left':
+            return hAlign.LEFT;
+        case 'right':
+            return hAlign.RIGHT;
+        case 'center':
+            return hAlign.CENTER;
+    }
+}
+
+function strToVAlign (value) {
+    const vAlign = cc.Label.VerticalAlign;
+    switch (value) {
+        case 'top':
+            return vAlign.TOP;
+        case 'bottom':
+            return vAlign.BOTTOM;
+        default :
+            return vAlign.CENTER;
+    }
+}
+
+function strToColor (value) {
+    value = (value.indexOf('#') === 0) ? value.substring(1) : value;
+    if (value.length === 8) {
+        let a = parseInt(value.substr(0, 2), 16) || 255;
+        let r = parseInt(value.substr(2, 2), 16) || 0;
+        let g = parseInt(value.substr(4, 2), 16) || 0;
+        let b = parseInt(value.substr(6, 2), 16) || 0;
+        return cc.color(r, g, b, a);
+    } else {
+        let r = parseInt(value.substr(2, 2), 16) || 0;
+        let g = parseInt(value.substr(4, 2), 16) || 0;
+        let b = parseInt(value.substr(6, 2), 16) || 0;
+        return cc.color(r, g, b, 255);
+    }
+}
+
 function getPropertyList (node, map) {
     let res = [];
     let properties = node.getElementsByTagName("properties");
@@ -218,12 +273,7 @@ function getPropertyList (node, map) {
             value = value === 'true';
         }
         else if (type === 'color') {
-            value = (value.indexOf('#') === 0) ? value.substring(1) : value;
-            let a = parseInt(value.substr(0, 2), 16) || 255;
-            let r = parseInt(value.substr(2, 2), 16) || 0;
-            let g = parseInt(value.substr(4, 2), 16) || 0;
-            let b = parseInt(value.substr(6, 2), 16) || 0;
-            value = cc.color(r, g, b, a);
+            value = strToColor(value);
         }
 
         map[name] = value;
@@ -293,7 +343,9 @@ cc.TMXMapInfo = function (tmxFile, tsxMap, textures) {
     this._tileSize = cc.size(0, 0);
     this._layers = [];
     this._tilesets = [];
+    this._imageLayers = [];
     this._tileProperties = {};
+    this._tileAnimations = {};
     this._tsxMap = null;
 
     // map of textures indexed by name
@@ -450,6 +502,23 @@ cc.TMXMapInfo.prototype = {
     },
 
     /**
+     * ImageLayers
+     * @return {Array}
+     */
+    getImageLayers () {
+        return this._imageLayers;
+    },
+
+    /**
+     * ImageLayers
+     * @param {cc.TMXImageLayerInfo} value
+     */
+    setImageLayers (value) {
+        this._allChildren.push(value);
+        this._imageLayers.push(value);
+    },
+
+    /**
      * tilesets
      * @return {Array}
      */
@@ -573,17 +642,20 @@ cc.TMXMapInfo.prototype = {
      * @param {Object} textures
      * @return {Boolean}
      */
-    initWithXML (tmxString, tsxMap, textures) {
+    initWithXML (tmxString, tsxMap, textures, imageLayerTextures) {
         this._tilesets.length = 0;
         this._layers.length = 0;
+        this._imageLayers.length = 0;
 
         this._tsxMap = tsxMap;
         this._textures = textures;
+        this._imageLayerTextures = imageLayerTextures;
 
         this._objectGroups.length = 0;
         this._allChildren.length = 0;
         this.properties.length = 0;
-        this._tileProperties.length = 0;
+        this._tileProperties = {};
+        this._tileAnimations = {};
 
         // tmp vars
         this.currentString = "";
@@ -602,7 +674,7 @@ cc.TMXMapInfo.prototype = {
      */
     parseXMLString (xmlStr, tilesetFirstGid) {
         let mapXML = this._parser._parseXML(xmlStr);
-        let i, j;
+        let i;
 
         // PARSE <map>
         let map = mapXML.documentElement;
@@ -717,6 +789,20 @@ cc.TMXMapInfo.prototype = {
                         let t = tiles[tIdx];
                         this.parentGID = parseInt(tileset.firstGid) + parseInt(t.getAttribute('id') || 0);
                         this._tileProperties[this.parentGID] = getPropertyList(t);
+                        let animations = t.getElementsByTagName('animation');
+                        if (animations && animations.length > 0) {
+                            let animation = animations[0];
+                            let framesData = animation.getElementsByTagName('frame');
+                            let animationProp = {frames:[], dt:0, frameIdx:0};
+                            this._tileAnimations[this.parentGID] = animationProp;
+                            let frames = animationProp.frames;
+                            for (let frameIdx = 0; frameIdx < framesData.length; frameIdx++) {
+                                let frame = framesData[frameIdx];
+                                let tileid = parseInt(tileset.firstGid) + parseInt(frame.getAttribute('tileid'));
+                                let duration = parseFloat(frame.getAttribute('duration'));
+                                frames.push({tileid : tileid, duration : duration / 1000, grid: null});
+                            }
+                        }
                     }
                 }
             }
@@ -728,6 +814,11 @@ cc.TMXMapInfo.prototype = {
             let childNode = childNodes[i];
             if (this._shouldIgnoreNode(childNode)) {
                 continue;
+            }
+
+            if (childNode.nodeName === 'imagelayer') {
+                let imageLayer = this._parseImageLayer(childNode);
+                this.setImageLayers(imageLayer);
             }
 
             if (childNode.nodeName === 'layer') {
@@ -750,6 +841,26 @@ cc.TMXMapInfo.prototype = {
             || node.nodeType === 4;  // cdata
     },
 
+    _parseImageLayer (selLayer) {
+        let imageLayer = new cc.TMXImageLayerInfo();
+        imageLayer.name = selLayer.getAttribute('name');
+        imageLayer.offset.x = parseFloat(selLayer.getAttribute('offsetx')) || 0;
+        imageLayer.offset.y = parseFloat(selLayer.getAttribute('offsety')) || 0;
+        let opacity = selLayer.getAttribute('opacity') || 1;
+        imageLayer.opacity = parseInt(255 * parseFloat(opacity)) || 255;
+
+        let datas = selLayer.getElementsByTagName('image');
+        if (datas || datas.length > 0) {
+            let data = datas[0];
+            let source = data.getAttribute('source');
+            imageLayer.sourceImage = this._imageLayerTextures[source];
+            imageLayer.width = parseInt(data.getAttribute('width')) || 0;
+            imageLayer.height = parseInt(data.getAttribute('height')) || 0;
+            imageLayer.trans = strToColor(data.getAttribute('trans'));
+        }
+        return imageLayer;
+    },
+ 
     _parseLayer (selLayer) {
         let data = selLayer.getElementsByTagName('data')[0];
 
@@ -769,7 +880,7 @@ cc.TMXMapInfo.prototype = {
             layer._opacity = parseInt(255 * parseFloat(opacity));
         else
             layer._opacity = 255;
-        layer.offset = cc.v2(parseFloat(selLayer.getAttribute('x')) || 0, parseFloat(selLayer.getAttribute('y')) || 0);
+        layer.offset = cc.v2(parseFloat(selLayer.getAttribute('offsetx')) || 0, parseFloat(selLayer.getAttribute('offsety')) || 0);
 
         let nodeValue = '';
         for (let j = 0; j < data.childNodes.length; j++) {
@@ -881,6 +992,18 @@ cc.TMXMapInfo.prototype = {
                 let visibleAttr = selObj.getAttribute('visible');
                 objectProp['visible'] = !(visibleAttr && parseInt(visibleAttr) === 0);
 
+                // text
+                let texts = selObj.getElementsByTagName('text');
+                if (texts && texts.length > 0) {
+                    let text = texts[0];
+                    objectProp['type'] = cc.TiledMap.TMXObjectType.TEXT;
+                    objectProp['wrap'] = text.getAttribute('wrap') == '1';
+                    objectProp['color'] = strToColor(text.getAttribute('color'));
+                    objectProp['halign'] = strToHAlign(text.getAttribute('halign'));
+                    objectProp['valign'] = strToHAlign(text.getAttribute('valign'));
+                    objectProp['text'] = text.childNodes[0].nodeValue;
+                }
+
                 // image
                 let gid = selObj.getAttribute('gid');
                 if (gid) {
@@ -937,8 +1060,24 @@ cc.TMXMapInfo.prototype = {
     },
 
     /**
+     * Sets the tile animations.
+     * @return {Object}
+     */
+    setTileAnimations (animations) {
+        this._tileAnimations = animations;
+    },
+
+    /**
+     * Gets the tile animations.
+     * @return {Object}
+     */
+    getTileAnimations () {
+        return this._tileAnimations;
+    },
+
+    /**
      * Gets the tile properties.
-     * @return {object}
+     * @return {Object}
      */
     getTileProperties () {
         return this._tileProperties;
@@ -946,10 +1085,10 @@ cc.TMXMapInfo.prototype = {
 
     /**
      * Set the tile properties.
-     * @param {object} tileProperties
+     * @param {Object} tileProperties
      */
     setTileProperties (tileProperties) {
-        this._tileProperties.push(tileProperties);
+        this._tileProperties = tileProperties;
     },
 
     /**
