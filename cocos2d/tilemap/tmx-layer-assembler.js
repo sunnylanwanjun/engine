@@ -42,6 +42,7 @@ const RenderFlow = require('../core/renderer/webgl/render-flow');
 
 let _mat4_temp = mat4.create();
 let _leftDown = {row:0, col:0};
+let _tempUV = {r:0, l:0, t:0, b:0};
 
 let SpineBuffer = require('../core/renderer/webgl/spine-buffer');
 let TiledMapBuffer = cc.Class({
@@ -104,7 +105,7 @@ let tmxAssembler = {
             buffer.reset();
 
             let leftDown, rightTop;
-            if (comp.enableClip) {
+            if (comp._enableClip) {
                 let clipRect = comp._clipRect;
                 leftDown = clipRect.leftDown;
                 rightTop = clipRect.rightTop;
@@ -170,11 +171,14 @@ let tmxAssembler = {
         let uintbuf = buffer._uintVData;
         let color = comp.node._color._val;
         let tiledTiles = comp._tiledTiles;
+        let texGrids = comp._texGrids;
+        let tiles = comp._tiles;
         let texIdToMatIdx = comp._texIdToMatIndex;
         let mats = comp.sharedMaterials, material = null;
 
         let vertices = comp._vertices;
-        let rowData, col, cols, row, rows, colData, tileSize, vfOffset = 0, grid = null;
+        let rowData, col, cols, row, rows, colData, tileSize,
+            vfOffset = 0, grid = null, gid = 0;
         let fillGrids = 0;
         let left = 0, bottom = 0, right = 0, top = 0; // x, y
         let tiledNode = null, curTexIdx = -1, matIdx;
@@ -260,8 +264,9 @@ let tmxAssembler = {
                     continue;
                 }
 
-                grid = colData.grid;
-
+                gid = tiles[colData.index];
+                grid = texGrids[(gid & FLIPPED_MASK) >>> 0];
+                
                 // check init or new material
                 if (curTexIdx !== grid.texId) {
                     // need flush
@@ -305,11 +310,12 @@ let tmxAssembler = {
                     this.fillByTiledNode(tiledNode, vbuf, vfOffset, left, right, top, bottom);
                 }
 
+                TiledMap.flipTexture(_tempUV, grid, gid);
                 // calc rect uv
-                ul = colData.l;
-                ur = colData.r;
-                vt = colData.t;
-                vb = colData.b;
+                ul = _tempUV.l;
+                ur = _tempUV.r;
+                vt = _tempUV.t;
+                vb = _tempUV.b;
 
                 // tl
                 vbuf[vfOffset+2].u = ul;

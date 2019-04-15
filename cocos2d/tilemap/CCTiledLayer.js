@@ -26,31 +26,9 @@
 const RenderComponent = require('../core/components/CCRenderComponent');
 const Material = require('../core/assets/material/CCMaterial');
 
-let DefaultTiledType = cc.Enum({ 'TILED_BATCH': 0, 'TILED_NODE': 1 });
-
 import { mat4, vec2 } from '../core/vmath';
 let _mat4_temp = mat4.create();
 let _vec2_temp = vec2.create();
-
-/**
- * !#en Enum for tiled type.
- * !#zh Tiled 渲染类型
- * @enum TiledLayerMgr.TiledType
- */
-let TiledType = cc.Enum({
-    /**
-     * !#en The tiled vertices batch render mode.
-     * !#zh tiled 顶点批量渲染模式。
-     * @property {Number} TILED_BATCH
-     */
-    TILED_BATCH: 0,
-    /**
-     * !#en The tiled as node render mode.
-     * !#zh 每个 tiled 作为节点渲染模式。
-     * @property {Number} TILED_NODE
-     */
-    TILED_NODE: 1,
-});
 
 /**
  * !#en Render the TMX layer.
@@ -73,36 +51,22 @@ let TiledLayer = cc.Class({
         _debugClip:{
             default: false,
             notify () {
-                this._updateDebugClip();
+                if (this._debugClip) {
+                    this._enableClipNode();
+                } else {
+                    this._disableClipNode();
+                }
             },
+            serializable: false,
             editorOnly: true,
             visible: true,
             animatable: false,
             displayName: "Debug Clip Rect",
-            tooltip: CC_DEV && 'i18n:COMPONENT.tiled_map.debug_clip'
-        },
-    
-        enableClip : {
-            default: true,
-            notify () {
-                this._clipDirty = true;
-            },
-            tooltip: CC_DEV && 'i18n:COMPONENT.tiled_map.enable_clip'
-        },
-
-        _tiledType: {
-            default: TiledType.TILED_BATCH,
-            type: DefaultTiledType,
-            editorOnly: true,
-            visible: true,
-            animatable: false,
-            displayName: "Tiled Render Mode",
-            tooltip: CC_DEV && 'i18n:COMPONENT.tiled_map.tiled_render_mode'
         },
     },
 
     ctor () {
-        this._userNodeGrid = {};// [row][col] = [node0, node1];
+        this._userNodeGrid = {};// [row][col] = {count: 0, nodesList: []};
         this._userNodeMap = {};// [id] = node;
         this._userNodeId = 1;
         this._userNodeDirty = false;
@@ -152,18 +116,29 @@ let TiledLayer = cc.Class({
 
         // use to debug layer clip range
         this._clipHandleNode = null;
+
+        // switch of clip
+        this._enableClip = cc.macro.ENABLE_TILEDMAP_CULLING;
     },
 
     /**
-     * !#en Inserts user's node into layer.
-     * !#zh 插入。
-     * @method getLayerName
-     * @return {String}
-     * @example
-     * let layerName = tiledLayer.getLayerName();
-     * cc.log(layerName);
+     * !#en enable or disable clip
+     * !#zh 开启获关闭裁剪。
+     * @method enableClip
+     * @param value
      */
-    insertUserNode (node) {
+    enableClip (value) {
+        this._enableClip = value;
+        this._clipDirty = true;
+    },
+
+    /**
+     * !#en Adds user's node into layer.
+     * !#zh 添加用户节点。
+     * @method addUserNode
+     * @param node
+     */
+    addUserNode (node) {
         let nodeId = node._nodeId_;
         if (nodeId) {
             cc.warn("CCTiledLayer:insertUserNode node has insert");
@@ -173,6 +148,7 @@ let TiledLayer = cc.Class({
         node._row_ = -1;
         node._col_ = -1;
         node._tiledLayer_ = this;
+        node._parent = this;
         this._userNodeMap[node._nodeId_] = node;
 
         let tempRowCol = this._tempRowCol;
@@ -188,6 +164,12 @@ let TiledLayer = cc.Class({
         }
     },
 
+    /**
+     * !#en Removes user's node.
+     * !#zh 移除用户节点。
+     * @method removeUserNode
+     * @param node
+     */
     removeUserNode (node) {
         let nodeId = node._nodeId_;
         if (!nodeId) {
@@ -204,8 +186,15 @@ let TiledLayer = cc.Class({
         node._row_ = null;
         node._col_ = null;
         node._nodeId_ = null;
+        node._parent = null;
     },
 
+    /**
+     * !#en Destroy user's node.
+     * !#zh 销毁用户节点。
+     * @method destroyUserNode
+     * @param node
+     */
     destroyUserNode (node) {
         this.removeUserNode(node);
         node.destroy();
@@ -296,6 +285,7 @@ let TiledLayer = cc.Class({
         node._row_ = -1;
         node._col_ = -1;
         node._index_ = -1;
+        this._userNodeDirty = true;
     },
 
     _isInLayer (row, col) {
@@ -344,7 +334,7 @@ let TiledLayer = cc.Class({
     },
 
     __preload () {
-        this._debugClip = false;
+        this._disableClipNode();
     },
 
     /**
@@ -614,7 +604,7 @@ let TiledLayer = cc.Class({
         return (tile & cc.TiledMap.TileFlag.FLIPPED_ALL) >>> 0;
     },
 
-    // just for test clip
+    // just for enable test clip
     _enableClipNode () {
         this._clipHandleNode = this.node.getChildByName("TESTCLIP");
         if (!this._clipHandleNode) {
@@ -626,6 +616,7 @@ let TiledLayer = cc.Class({
         }
     },
 
+    // just for disable test clip
     _disableClipNode () {
         this._clipHandleNode = this.node.getChildByName("TESTCLIP");
         if (this._clipHandleNode) {
@@ -751,7 +742,7 @@ let TiledLayer = cc.Class({
     },
 
     update () {
-        if (this.enableClip) {
+        if (this._enableClip) {
             if (this._clipHandleNode) {
                 this._updateViewPort(this._clipHandleNode.x, this._clipHandleNode.y, this._clipHandleNode.width, this._clipHandleNode.height);
             } else {
@@ -831,7 +822,6 @@ let TiledLayer = cc.Class({
 
         let clipCol = 0, clipRow = 0;
         let tileOffset = null;
-        let flippedX = false, flippedY = false, tempVal;
 
         this._topOffset = 0;
         this._downOffset = 0;
@@ -842,8 +832,8 @@ let TiledLayer = cc.Class({
             for (let col = 0; col < cols; ++col) {
                 let index = colOffset + col;
                 gid = tiles[index];
-                
                 grid = grids[(gid & FLIPPED_MASK) >>> 0];
+
                 if (!grid) {
                     continue;
                 }
@@ -937,33 +927,8 @@ let TiledLayer = cc.Class({
 
                 colData.left = left;
                 colData.bottom = bottom;
-                colData.grid = grid;
-                colData.index = index;
-                colData.r = grid.r;
-                colData.l = grid.l;
-                colData.b = grid.b;
-                colData.t = grid.t;
-
-                // rotation
-                if ((gid & TileFlag.DIAGONAL) >>> 0) {
-                    tempVal = colData.r;
-                    colData.r = colData.b;
-                    colData.b = tempVal;
-                }
-
-                // flip x
-                if ((gid & TileFlag.HORIZONTAL) >>> 0) {
-                    tempVal = colData.r;
-                    colData.r = colData.l;
-                    colData.l = tempVal;
-                }
-
-                // flip y
-                if ((gid & TileFlag.HORIZONTAL) >>> 0) {
-                    tempVal = colData.b;
-                    colData.b = colData.t;
-                    colData.t = tempVal;
-                }
+                // this index is tiledmap grid index
+                colData.index = index; 
             }
             colOffset += cols;
         }
@@ -1250,39 +1215,11 @@ let TiledLayer = cc.Class({
         }
 
         // offset (after layer orientation is set);
-        this._offset = this._calculateLayerOffset(layerInfo.offset);
+        this._offset = cc.TiledMap.calculateLayerOffset(layerInfo.offset, mapInfo);
 
         this._useAutomaticVertexZ = false;
         this._vertexZvalue = 0;
         this._prepareToRender();
-    },
-
-    _calculateLayerOffset (pos) {
-        let ret = cc.v2(0,0);
-        switch (this._layerOrientation) {
-            case cc.TiledMap.Orientation.ORTHO:
-                ret = cc.v2(pos.x * this._mapTileSize.width, -pos.y * this._mapTileSize.height);
-                break;
-            case cc.TiledMap.Orientation.ISO:
-                ret = cc.v2((this._mapTileSize.width / 2) * (pos.x - pos.y),
-                    (this._mapTileSize.height / 2 ) * (-pos.x - pos.y));
-                break;
-            case cc.TiledMap.Orientation.HEX:
-                if(this._staggerAxis === cc.TiledMap.StaggerAxis.STAGGERAXIS_Y)
-                {
-                    let diffX = (this._staggerIndex === cc.TiledMap.StaggerIndex.STAGGERINDEX_EVEN) ? this._mapTileSize.width/2 : 0;
-                    ret = cc.v2(pos.x * this._mapTileSize.width + diffX,
-                               -pos.y * (this._mapTileSize.height - (this._mapTileSize.width - this._hexSideLength) / 2));
-                }
-                else if(this._staggerAxis === cc.TiledMap.StaggerAxis.STAGGERAXIS_X)
-                {
-                    let diffY = (this._staggerIndex === cc.TiledMap.StaggerIndex.STAGGERINDEX_ODD) ? this._mapTileSize.height/2 : 0;
-                    ret = cc.v2(pos.x * (this._mapTileSize.width - (this._mapTileSize.width - this._hexSideLength) / 2),
-                               -pos.y * this._mapTileSize.height + diffY);
-                }
-                break;
-        }
-        return ret;
     },
 
     _prepareToRender () {

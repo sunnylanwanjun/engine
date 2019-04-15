@@ -115,15 +115,13 @@ let TiledObjectGroup = cc.Class({
         return this._objects;
     },
 
-    _addImage (gid) {
-        
-    },
-
     _init (groupInfo, mapInfo, texGrids) {
         const TiledMap = cc.TiledMap;
         const TMXObjectType = TiledMap.TMXObjectType;
         const Orientation = TiledMap.Orientation;
         const StaggerAxis = TiledMap.StaggerAxis;
+        const TileFlag = TiledMap.TileFlag;
+        const FLIPPED_MASK = TileFlag.FLIPPED_MASK;
 
         this._groupName = groupInfo.name;
         this._positionOffset = groupInfo.offset;
@@ -152,13 +150,6 @@ let TiledObjectGroup = cc.Class({
             let object = objects[i];
             let objType = object.type;
             object.offset = cc.v2(object.x, object.y);
-
-            if (objType === TMXObjectType.IMAGE) {
-                let imageGID = object.gid;
-                if (imageGID) {
-                    this._addImage(imageGID);
-                }
-            }
             
             let points = object.points || object.polylinePoints;
             if (points) {
@@ -168,7 +159,6 @@ let TiledObjectGroup = cc.Class({
             }
 
             if (Orientation.ISO !== mapInfo.orientation) {
-                object.x = Number(object.x);
                 object.y = height - object.y;
             } else {
                 let posIdxX = object.x / tileSize.width * 2;
@@ -177,6 +167,52 @@ let TiledObjectGroup = cc.Class({
                 object.y = tileSize.height / 2 * (mapSize.height * 2 - posIdxX - posIdxY);
             }
 
+            if (objType === TMXObjectType.TEXT) {
+                let textName = "text" + object.id;
+                let textNode = this.node.getChildByName(textName);
+                if (!textNode) {
+                    textNode = new cc.Node();
+                    textNode.anchorX = 0;
+                    textNode.anchorY = 0;
+                    textNode.angle = object.rotation;
+                    textNode.x = object.x;
+                    textNode.y = object.y;
+                    textNode.name = textName;
+                    textNode.parent = this.node;
+                    textNode.width = object.width;
+                    textNode.height = object.height;
+                    textNode.color = object.color;
+
+                    let label = textNode.addComponent(cc.Label);
+                    label.enableWrapText = object.wrap;
+                    label.string = object.text;
+                    label.horizontalAlign = object.halign;
+                    label.verticalAlign = object.valign;
+                }
+            }
+
+            if (objType === TMXObjectType.IMAGE) {
+                let grid = texGrids[(object.gid & FLIPPED_MASK) >>> 0];
+                let imgName = "img" + object.id;
+                let imgNode = this.node.getChildByName(imgName);
+                if (!imgNode && grid) {
+                    imgNode = new cc.Node();
+                    imgNode.anchorX = 0;
+                    imgNode.anchorY = 0;
+                    imgNode.angle = object.rotation;
+                    imgNode.x = object.x;
+                    imgNode.y = object.y;
+                    imgNode.name = imgName;
+                    imgNode.parent = this.node;
+                    imgNode.width = object.width;
+                    imgNode.height = object.height;
+
+                    let sp = imgNode.addComponent(cc.Sprite);
+                    let spGrid = {};
+                    TiledMap.flipTexture(spGrid, grid, object.gid);
+                    sp.spriteFrame = new cc.SpriteFrame(grid.tileset.soureImage, spGrid);
+                }
+            }
         }
         this._objects = objects;
     }
