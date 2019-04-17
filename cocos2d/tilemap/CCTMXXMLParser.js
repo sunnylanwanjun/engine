@@ -98,6 +98,7 @@ cc.TMXLayerInfo.prototype = {
  */
 cc.TMXImageLayerInfo = function () {
     this.name= "";
+    this.visible = true;
     this.width = 0;
     this.height = 0;
     this.offset = cc.v2(0,0);
@@ -209,29 +210,32 @@ cc.TMXTilesetInfo.prototype = {
 function strToHAlign (value) {
     const hAlign = cc.Label.HorizontalAlign;
     switch (value) {
-        case 'left':
-            return hAlign.LEFT;
-        case 'right':
-            return hAlign.RIGHT;
         case 'center':
             return hAlign.CENTER;
+        case 'right':
+            return hAlign.RIGHT;
+        default:
+            return hAlign.LEFT;
     }
 }
 
 function strToVAlign (value) {
     const vAlign = cc.Label.VerticalAlign;
     switch (value) {
-        case 'top':
-            return vAlign.TOP;
+        case 'center':
+            return vAlign.CENTER;
         case 'bottom':
             return vAlign.BOTTOM;
-        default :
-            return vAlign.CENTER;
+        default:
+            return vAlign.TOP;
     }
 }
 
 function strToColor (value) {
-    value = (value.indexOf('#') === 0) ? value.substring(1) : value;
+    if (!value) {
+        return cc.color(0, 0, 0, 255);
+    }
+    value = (value.indexOf('#') !== -1) ? value.substring(1) : value;
     if (value.length === 8) {
         let a = parseInt(value.substr(0, 2), 16) || 255;
         let r = parseInt(value.substr(2, 2), 16) || 0;
@@ -239,9 +243,9 @@ function strToColor (value) {
         let b = parseInt(value.substr(6, 2), 16) || 0;
         return cc.color(r, g, b, a);
     } else {
-        let r = parseInt(value.substr(2, 2), 16) || 0;
-        let g = parseInt(value.substr(4, 2), 16) || 0;
-        let b = parseInt(value.substr(6, 2), 16) || 0;
+        let r = parseInt(value.substr(0, 2), 16) || 0;
+        let g = parseInt(value.substr(2, 2), 16) || 0;
+        let b = parseInt(value.substr(4, 2), 16) || 0;
         return cc.color(r, g, b, 255);
     }
 }
@@ -327,7 +331,7 @@ function getPropertyList (node, map) {
  * @param {Object} tsxMap
  * @param {Object} textures
  */
-cc.TMXMapInfo = function (tmxFile, tsxMap, textures) {
+cc.TMXMapInfo = function (tmxFile, tsxMap, textures, imageLayerTextures) {
     this.properties = [];
     this.orientation = null;
     this.parentElement = null;
@@ -356,7 +360,9 @@ cc.TMXMapInfo = function (tmxFile, tsxMap, textures) {
     this._staggerIndex = null;
     this._hexSideLength = 0;
 
-    this.initWithXML(tmxFile, tsxMap, textures);
+    this._imageLayerTextures = null;
+
+    this.initWithXML(tmxFile, tsxMap, textures, imageLayerTextures);
 };
 cc.TMXMapInfo.prototype = {
     constructor: cc.TMXMapInfo,
@@ -818,7 +824,9 @@ cc.TMXMapInfo.prototype = {
 
             if (childNode.nodeName === 'imagelayer') {
                 let imageLayer = this._parseImageLayer(childNode);
-                this.setImageLayers(imageLayer);
+                if (imageLayer) {
+                    this.setImageLayers(imageLayer);
+                }
             }
 
             if (childNode.nodeName === 'layer') {
@@ -842,21 +850,29 @@ cc.TMXMapInfo.prototype = {
     },
 
     _parseImageLayer (selLayer) {
+        let datas = selLayer.getElementsByTagName('image');
+        if (!datas || datas.length == 0) return null;
+
         let imageLayer = new cc.TMXImageLayerInfo();
         imageLayer.name = selLayer.getAttribute('name');
         imageLayer.offset.x = parseFloat(selLayer.getAttribute('offsetx')) || 0;
         imageLayer.offset.y = parseFloat(selLayer.getAttribute('offsety')) || 0;
+        let visible = selLayer.getAttribute('visible');
+        imageLayer.visible = !(visible === "0");
+
         let opacity = selLayer.getAttribute('opacity') || 1;
         imageLayer.opacity = parseInt(255 * parseFloat(opacity)) || 255;
 
-        let datas = selLayer.getElementsByTagName('image');
-        if (datas || datas.length > 0) {
-            let data = datas[0];
-            let source = data.getAttribute('source');
-            imageLayer.sourceImage = this._imageLayerTextures[source];
-            imageLayer.width = parseInt(data.getAttribute('width')) || 0;
-            imageLayer.height = parseInt(data.getAttribute('height')) || 0;
-            imageLayer.trans = strToColor(data.getAttribute('trans'));
+        let data = datas[0];
+        let source = data.getAttribute('source');
+        imageLayer.sourceImage = this._imageLayerTextures[source];
+        imageLayer.width = parseInt(data.getAttribute('width')) || 0;
+        imageLayer.height = parseInt(data.getAttribute('height')) || 0;
+        imageLayer.trans = strToColor(data.getAttribute('trans'));
+
+        if (!imageLayer.sourceImage) {
+            cc.errorID(7221, source);
+            return null;
         }
         return imageLayer;
     },
@@ -1000,7 +1016,8 @@ cc.TMXMapInfo.prototype = {
                     objectProp['wrap'] = text.getAttribute('wrap') == '1';
                     objectProp['color'] = strToColor(text.getAttribute('color'));
                     objectProp['halign'] = strToHAlign(text.getAttribute('halign'));
-                    objectProp['valign'] = strToHAlign(text.getAttribute('valign'));
+                    objectProp['valign'] = strToVAlign(text.getAttribute('valign'));
+                    objectProp['pixelsize'] = parseInt(text.getAttribute('pixelsize')) || 16;
                     objectProp['text'] = text.childNodes[0].nodeValue;
                 }
 

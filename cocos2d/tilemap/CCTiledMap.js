@@ -235,6 +235,7 @@ let TiledMap = cc.Class({
         this._imageLayers = [];
         this._layers = [];
         this._groups = [];
+        this._images = [];
         this._properties = [];
         this._tileProperties = [];
         
@@ -499,21 +500,55 @@ let TiledMap = cc.Class({
         // remove the layers & object groups added before
         let layers = this._layers;
         for (let i = 0, l = layers.length; i < l; i++) {
+            layers[i].node.removeFromParent(true);
             layers[i].node.destroy();
         }
         layers.length = 0;
 
         let groups = this._groups;
         for (let i = 0, l = groups.length; i < l; i++) {
+            groups[i].node.removeFromParent(true);
             groups[i].node.destroy();
         }
         groups.length = 0;
+
+        let images = this._images;
+        for (let i = 0, l = images.length; i < l; i++) {
+            images[i].removeFromParent(true);
+        }
+        images.length = 0;
     },
 
     _syncAnchorPoint () {
         let anchor = this.node.getAnchorPoint();
-        for (let i = 0, l = this._layers.length; i < l; i++) {
-            this._layers[i].node.setAnchorPoint(anchor);
+        let leftTopX = this.node.width * anchor.x;
+        let leftTopY = this.node.height * (1 - anchor.y);
+        let i, l;
+        for (i = 0, l = this._layers.length; i < l; i++) {
+            let layerInfo = this._layers[i];
+            let layerNode = layerInfo.node;
+            // Tiled layer sync anchor to map because it's old behavior,
+            // do not change the behavior avoid influence user's existing logic.
+            layerNode.setAnchorPoint(anchor);
+        }
+
+        for (i = 0, l = this._groups.length; i < l; i++) {
+            let groupInfo = this._groups[i];
+            let groupNode = groupInfo.node;
+            // Group layer not sync anchor to map because it's old behavior,
+            // do not change the behavior avoid influence user's existing logic.
+            groupNode.anchorX = 0.5;
+            groupNode.anchorY = 0.5;
+            groupNode.x = groupInfo._offset.x - leftTopX + groupNode.width * groupNode.anchorX;
+            groupNode.y = groupInfo._offset.y + leftTopY - groupNode.height * groupNode.anchorY;
+        }
+
+        for (i = 0, l = this._images.length; i < l; i++) {
+            let image = this._images[i];
+            image.anchorX = 0.5;
+            image.anchorY = 0.5;
+            image.x = image._offset.x - leftTopX + image.width * image.anchorX;
+            image.y = image._offset.y + leftTopY - image.height * image.anchorY;
         }
     },
 
@@ -532,23 +567,28 @@ let TiledMap = cc.Class({
         let mapInfo = this._mapInfo;
         let layers = this._layers;
         let groups = this._groups;
+        let images = this._images;
         let node = this.node;
         let layerInfos = mapInfo.getAllChildren();
         let textures = this._textures;
-        let maxWidth = 0, maxHeight = 0;
         if (layerInfos && layerInfos.length > 0) {
             for (let i = 0, len = layerInfos.length; i < len; i++) {
                 let layerInfo = layerInfos[i];
                 let name = layerInfo.name;
 
                 let child = this.node.getChildByName(name);
+                if (!layerInfo.visible) {
+                    if (child) {
+                        child.removeFromParent(true);
+                    }
+                    continue;
+                }
+
                 if (!child) {
                     child = new cc.Node();
                     child.name = name;
                     node.addChild(child);
                 }
-
-                if (!layerInfo.visible) continue;
 
                 if (layerInfo instanceof cc.TMXLayerInfo) {
                     let layer = child.getComponent(cc.TiledLayer);
@@ -560,11 +600,6 @@ let TiledMap = cc.Class({
 
                     // tell the layerinfo to release the ownership of the tiles map.
                     layerInfo.ownTiles = false;
-
-                    // update content size with the max size
-                    if (maxWidth < child.width) maxWidth = child.width;
-                    if (maxHeight < child.height) maxHeight = child.height;
-
                     layers.push(layer);
                 }
                 else if (layerInfo instanceof cc.TMXObjectGroupInfo) {
@@ -576,25 +611,27 @@ let TiledMap = cc.Class({
                     groups.push(group);
                 }
                 else if (layerInfo instanceof cc.TMXImageLayerInfo) {
-                    let offset = cc.TiledMap.calculateLayerOffset(layerInfo.offset, mapInfo);
                     let texture = layerInfo.sourceImage;
-                    child.x = offset.x;
-                    child.y = offset.y;
                     child.opacity = layerInfo.opacity;
-                    child.width = texture.width;
-                    child.height = texture.height;
+                    child.layerInfo = layerInfo;
+                    child._offset = cc.v2(layerInfo.offset.x, -layerInfo.offset.y);
 
                     let image = child.getComponent(cc.Sprite);
                     if (!image) {
                         image = child.addComponent(cc.Sprite);
                     }
-                    image.spriteFrame = new cc.SpriteFrame(texture);
+                    image.spriteFrame = new cc.SpriteFrame();
+                    image.spriteFrame.setTexture(texture);
+
+                    child.width = texture.width;
+                    child.height = texture.height;
+                    images.push(child);
                 }
             }
         }
 
-        this.node.width = maxWidth;
-        this.node.height = maxHeight;
+        this.node.width = this._mapSize.width * this._tileSize.width;
+        this.node.height = this._mapSize.height * this._tileSize.height;
         this._syncAnchorPoint();
     },
 

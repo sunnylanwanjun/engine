@@ -117,19 +117,31 @@ let TiledLayer = cc.Class({
         // use to debug layer clip range
         this._clipHandleNode = null;
 
+        this._leftDownToCenterX = 0;
+        this._leftDownToCenterY = 0;
+
+        this._hasAniGrid = false;
+        this._animations = null;
+
         // switch of clip
         this._enableClip = cc.macro.ENABLE_TILEDMAP_CULLING;
     },
 
+    _hasAnimation () {
+        return this._hasAniGrid;
+    },
+
     /**
      * !#en enable or disable clip
-     * !#zh 开启获关闭裁剪。
+     * !#zh 开启或关闭裁剪。
      * @method enableClip
      * @param value
      */
     enableClip (value) {
-        this._enableClip = value;
-        this._clipDirty = true;
+        if (this._enableClip != value) {
+            this._enableClip = value;
+            this._clipDirty = true;
+        }
     },
 
     /**
@@ -148,7 +160,6 @@ let TiledLayer = cc.Class({
         node._row_ = -1;
         node._col_ = -1;
         node._tiledLayer_ = this;
-        node._parent = this;
         this._userNodeMap[node._nodeId_] = node;
 
         let tempRowCol = this._tempRowCol;
@@ -186,7 +197,6 @@ let TiledLayer = cc.Class({
         node._row_ = null;
         node._col_ = null;
         node._nodeId_ = null;
-        node._parent = null;
     },
 
     /**
@@ -322,15 +332,29 @@ let TiledLayer = cc.Class({
 
     onEnable () {
         this._super();
+        this.node.on(cc.Node.EventType.ANCHOR_CHANGED, this._syncAnchorPoint, this);
         this._activateMaterial();
+    },
+
+    onDisable () {
+        this.node.off(cc.Node.EventType.ANCHOR_CHANGED, this._syncAnchorPoint, this);
+    },
+
+    _syncAnchorPoint () {
+        this._leftDownToCenterX = this.node.width * this.node.anchorX;
+        this._leftDownToCenterY = this.node.height * this.node.anchorY;
     },
 
     onDestroy () {
         this._super();
-        if (this._buffer) {
-            this._buffer.destroy();
-            this._buffer = null;
-        }
+        // if (this._renderDataList) {
+        //     this._renderDataList.reset();
+        //     this._renderDataList = null;
+        // }
+        // if (this._buffer) {
+        //     this._buffer.destroy();
+        //     this._buffer = null;
+        // }
     },
 
     __preload () {
@@ -638,71 +662,77 @@ let TiledLayer = cc.Class({
     // 'x, y' is the position of viewPort, which's anchor point is at the center of rect.
     // 'width, height' is the size of viewPort.
     _updateViewPort (x, y, width, height) {
-        if (this._viewPort.width === width && 
-            this._viewPort.height === height &&
-            this._viewPort.x === x &&
-            this._viewPort.y === y) {
-            return;
-        }
+        // if (this._viewPort.width === width && 
+        //     this._viewPort.height === height &&
+        //     this._viewPort.x === x &&
+        //     this._viewPort.y === y) {
+        //     return;
+        // }
         this._viewPort.x = x;
         this._viewPort.y = y;
         this._viewPort.width = width;
         this._viewPort.height = height;
 
-        let vpx = this._viewPort.x - this._offset.x;
-        let vpy = this._viewPort.y - this._offset.y;
+        // if map's type is iso, reserve bottom line is 2 to avoid show empty grid because of iso grid arithmetic
+        let reserveLine = 1;
+        if (this._layerOrientation === cc.TiledMap.Orientation.ISO) {
+            reserveLine = 2;
+        }
+
+        let vpx = this._viewPort.x - this._offset.x + this._leftDownToCenterX;
+        let vpy = this._viewPort.y - this._offset.y + this._leftDownToCenterY;
 
         let leftDownX = vpx + this._leftOffset;
         let leftDownY = vpy + this._downOffset;
         let rightTopX = vpx + width + this._rightOffset;
         let rightTopY = vpy + height + this._topOffset;
 
-        if (leftDownX < 0) leftDownX = 0;
-        if (leftDownY < 0) leftDownY = 0;
-        if (rightTopX < 0) rightTopX = 0;
-        if (rightTopY < 0) rightTopY = 0;
-
         let leftDown = this._clipRect.leftDown;
         let rightTop = this._clipRect.rightTop;
         let tempRowCol = this._tempRowCol;
 
+        if (leftDownX < 0) leftDownX = 0;
+        if (leftDownY < 0) leftDownY = 0;
+
         // calc left down
         this._positionToRowCol(leftDownX, leftDownY, tempRowCol);
-        tempRowCol.row = tempRowCol.row > 0 ? tempRowCol.row : 0;
-        tempRowCol.col = tempRowCol.col > 0 ? tempRowCol.col : 0;
-
         // make range large
-        if (tempRowCol.row >= 1) tempRowCol.row--;
-        if (tempRowCol.col >= 1) tempRowCol.col--;
+        tempRowCol.row-=reserveLine;
+        tempRowCol.col-=reserveLine;
+        // insure left down row col greater than 0
+        tempRowCol.row = tempRowCol.row > 0 ? tempRowCol.row : 0;
+        tempRowCol.col = tempRowCol.col > 0 ? tempRowCol.col : 0;        
+
         if (tempRowCol.row !== leftDown.row || tempRowCol.col !== leftDown.col) {
             leftDown.row = tempRowCol.row;
             leftDown.col = tempRowCol.col;
             this._clipDirty = true;
         }
 
-        // calc right top
-        this._positionToRowCol(rightTopX, rightTopY, tempRowCol);
-        tempRowCol.row = tempRowCol.row > 0 ? tempRowCol.row : 0;
-        tempRowCol.col = tempRowCol.col > 0 ? tempRowCol.col : 0;
+        // show nothing
+        if (rightTopX < 0 || rightTopY < 0) {
+            tempRowCol.row = -1;
+            tempRowCol.col = -1;
+        } else {
+            // calc right top
+            this._positionToRowCol(rightTopX, rightTopY, tempRowCol);
+            // make range large
+            tempRowCol.row++;
+            tempRowCol.col++;
+        }
 
-        // make range large
-        tempRowCol.row++;
-        tempRowCol.col++;
+        // avoid range out of max rect
+        if (tempRowCol.row > this._rightTop.row) tempRowCol.row = this._rightTop.row;
+        if (tempRowCol.col > this._rightTop.col) tempRowCol.col = this._rightTop.col;
+
         if (tempRowCol.row !== rightTop.row || tempRowCol.col !== rightTop.col) {
             rightTop.row = tempRowCol.row;
             rightTop.col = tempRowCol.col;
             this._clipDirty = true;
         }
-
-        // avoid range out of max rect
-        if (rightTop.row > this._rightTop.row) rightTop.row = this._rightTop.row;
-        if (rightTop.col > this._rightTop.col) rightTop.col = this._rightTop.col;
-
-        // calc clip rect
-        this._clipDirty = true;
     },
 
-    // it result may not precise, but dose't matter, it just use to get range
+    // the result may not precise, but it dose't matter, it just uses to be got range
     _positionToRowCol (x, y, result) {
         const TiledMap = cc.TiledMap;
         const Orientation = TiledMap.Orientation;
@@ -713,6 +743,7 @@ let TiledLayer = cc.Class({
             maptw2 = maptw * 0.5,
             mapth2 = mapth * 0.5;
         let row = 0, col = 0, diffX2 = 0, diffY2 = 0, axis = this._staggerAxis;
+        let cols = this._layerSize.width;
 
         switch (this._layerOrientation) {
             // left top to right dowm
@@ -721,6 +752,7 @@ let TiledLayer = cc.Class({
                 row = Math.floor(y / mapth);
                 break;
             // right top to left down
+            // iso can be treat as special hex whose hex side length is 0
             case Orientation.ISO:
                 col = Math.floor(x / maptw2);
                 row = Math.floor(y / mapth2);
@@ -755,6 +787,8 @@ let TiledLayer = cc.Class({
             this.node._updateWorldMatrix();
             mat4.invert(_mat4_temp, this.node._worldMatrix);
             let rect = cc.visibleRect;
+            _vec2_temp.x = 0;
+            _vec2_temp.y = 0;
             vec2.transformMat4(_vec2_temp, _vec2_temp, _mat4_temp);
             this._updateViewPort(_vec2_temp.x, _vec2_temp.y, rect.width, rect.height);
         }
@@ -826,18 +860,25 @@ let TiledLayer = cc.Class({
         }
 
         let clipCol = 0, clipRow = 0;
-        let tileOffset = null;
+        let tileOffset = null, gridGID = 0;
 
         this._topOffset = 0;
         this._downOffset = 0;
         this._leftOffset = 0;
         this._rightOffset = 0;
+        this._hasAniGrid = false;
 
         for (let row = 0; row < rows; ++row) {
             for (let col = 0; col < cols; ++col) {
                 let index = colOffset + col;
                 gid = tiles[index];
-                grid = grids[(gid & FLIPPED_MASK) >>> 0];
+                gridGID = ((gid & FLIPPED_MASK) >>> 0);
+                grid = grids[gridGID];
+
+                // if has animation, grid must be updated per frame
+                if (this._animations[gridGID]) {
+                    this._hasAniGrid = true;
+                }
 
                 if (!grid) {
                     continue;
@@ -914,7 +955,7 @@ let TiledLayer = cc.Class({
 
                 // record the far right, handle the offset like the shape '→' which is positive number, 
                 // so must get negation
-                if (this._rightOffset < -tileOffset.x) {
+                if (this._rightOffset > -tileOffset.x) {
                     this._rightOffset = -tileOffset.x;
                 }
 
@@ -926,7 +967,7 @@ let TiledLayer = cc.Class({
 
                 // record the far down, handle the offset like the shape '↑' which is negative number,
                 // so need not get negation
-                if (this._downOffset < tileOffset.y) {
+                if (this._downOffset > tileOffset.y) {
                     this._downOffset = tileOffset.y;
                 }
 
@@ -1143,11 +1184,21 @@ let TiledLayer = cc.Class({
         let tilesetIndexArr = this._tilesetIndexArr;
         let tilesetIdxMap = {};
 
+        const TiledMap = cc.TiledMap;
+        const TileFlag = TiledMap.TileFlag;
+        const FLIPPED_MASK = TileFlag.FLIPPED_MASK;
+
         tilesetIndexArr.length = 0;
         for (let i = 0; i < tiles.length; i++) {
             let gid = tiles[i];
             if (gid === 0) continue;
-            let tilesetIdx = texGrids[gid].texId;
+            gid = ((gid & FLIPPED_MASK) >>> 0);
+            let grid = texGrids[gid];
+            if (!grid) {
+                cc.error("CCTiledLayer:_traverseAllGrid grid is null, gid is:", gid);
+                continue;
+            }
+            let tilesetIdx = grid.texId;
             if (tilesetIdxMap[tilesetIdx]) continue;
             tilesetIdxMap[tilesetIdx] = true;
             tilesetIndexArr.push(tilesetIdx);
@@ -1172,6 +1223,7 @@ let TiledLayer = cc.Class({
         this._staggerAxis = mapInfo.getStaggerAxis();
         this._staggerIndex = mapInfo.getStaggerIndex();
         this._hexSideLength = mapInfo.getHexSideLength();
+        this._animations = mapInfo.getTileAnimations();
 
         // tilesets
         this._tilesets = tilesets;
@@ -1214,10 +1266,10 @@ let TiledLayer = cc.Class({
         }
 
         // offset (after layer orientation is set);
-        this._offset = cc.TiledMap.calculateLayerOffset(layerInfo.offset, mapInfo);
-
+        this._offset = cc.v2(layerInfo.offset.x, -layerInfo.offset.y);
         this._useAutomaticVertexZ = false;
         this._vertexZvalue = 0;
+        this._syncAnchorPoint();
         this._prepareToRender();
     },
 
@@ -1246,13 +1298,14 @@ let TiledLayer = cc.Class({
             if (!material) {
                 material = Material.getInstantiatedBuiltinMaterial('sprite', this);
                 material.define('USE_TEXTURE', true);
+                material.define('_USE_MODEL', true);
             }
             else {
                 material = Material.getInstantiatedMaterial(material, this);
             }
 
             material.setProperty('texture', texture);
-            this.setMaterial(0, material);
+            this.setMaterial(i, material);
 
             texIdMatIdx[tilesetIdx] = i;
         }

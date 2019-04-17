@@ -41,20 +41,12 @@ const maxGridsLimit = parseInt(65535 / 4);
 import { mat4, vec3 } from '../core/vmath';
 
 const RenderFlow = require('../core/renderer/render-flow');
+const TiledMapBuffer = require('./tiledmap-buffer');
 
 let _mat4_temp = mat4.create();
 let _vec3_temp = vec3.create();
 let _leftDown = {row:0, col:0};
 let _tempUV = {r:0, l:0, t:0, b:0};
-
-let SpineBuffer = require('../core/renderer/webgl/spine-buffer');
-let TiledMapBuffer = cc.Class({
-    name: 'cc.TiledMapBuffer',
-    extends: require('../core/renderer/webgl/quad-buffer'),
-
-    requestStatic : SpineBuffer.prototype.requestStatic,
-    adjust : SpineBuffer.prototype.adjust,
-});
 
 let RenderDataList = cc.Class({
     name: 'cc.TiledMapRenderDataList',
@@ -91,6 +83,15 @@ let RenderDataList = cc.Class({
     }
 });
 
+function _visitUserNode (userNode, layerMat, moveX, moveY) {
+    userNode._updateLocalMatrix();
+    mat4.mul(userNode._worldMatrix, layerMat, userNode._matrix);
+    vec3.set(_vec3_temp, -moveX, -moveY, 0);
+    mat4.translate(userNode._worldMatrix, userNode._worldMatrix, _vec3_temp);
+    userNode._renderFlag &= ~RenderFlow.FLAG_WORLD_TRANSFORM;
+    RenderFlow.visitRootNode(userNode);
+}
+
 let tmxAssembler = {
     updateRenderData (comp) {
         if (!comp._renderDataList) {
@@ -104,7 +105,7 @@ let tmxAssembler = {
         if (vertices.length === 0 ) return;
 
         let buffer = comp._buffer;
-        //if (comp._isClipDirty() || comp._isUserNodeDirty()) {
+        // if (comp._isClipDirty() || comp._isUserNodeDirty() || comp._hasAnimation()) {
             buffer.reset();
 
             let leftDown, rightTop;
@@ -142,11 +143,20 @@ let tmxAssembler = {
             }
             comp._setClipDirty(false);
             comp._setUserNodeDirty(false);
+
+            // avoid other assembler call model batcher flush func 
+            // or will  draw custom ia twice
+            buffer.reset();
+
         // } else {
         //     let renderDataList = comp._renderDataList;
         //     let renderData = null;
         //     let nodesRenderList = null;
         //     let nodesList = null;
+
+        //     let moveX = comp._leftDownToCenterX;
+        //     let moveY = comp._leftDownToCenterY;
+
         //     for (let i = 0; i < renderDataList._offset; i++) {
         //         renderData = renderDataList._dataList[i];
         //         if (renderData.ia._count > 0) {
@@ -159,7 +169,7 @@ let tmxAssembler = {
         //             for (let idx = 0; idx < nodesList.length; idx++) {
         //                 node = nodesList[idx];
         //                 if (!node) continue;
-        //                 RenderFlow.visitRootNode(node);
+        //                 RenderFlow.visitRootNode(node, layerMat, moveX, moveY);
         //             }
         //         }
         //     }
@@ -169,20 +179,28 @@ let tmxAssembler = {
     // rowMoveDir is -1 or 1, -1 means decrease, 1 means increase
     // colMoveDir is -1 or 1, -1 means decrease, 1 means increase
     traverseGrids (comp, renderer, leftDown, rightTop, rowMoveDir, colMoveDir) {
+        let renderDataList = comp._renderDataList;
+        renderDataList.reset();
+
+        // show nothing
+        if (rightTop.row < 0 || rightTop.col < 0) return;
+
         let buffer = comp._buffer;
         let vbuf = buffer._vData;
         let uintbuf = buffer._uintVData;
+        let renderData = renderDataList.popRenderData(buffer._vb, buffer._ib, 0, 0);
+        let ia = renderData.ia;
+
         let layerNode = comp.node;
         let color = layerNode._color._val;
         let tiledTiles = comp._tiledTiles;
         let texGrids = comp._texGrids;
         let tiles = comp._tiles;
         let texIdToMatIdx = comp._texIdToMatIndex;
-        let mats = comp.sharedMaterials, material = null;
-        let anchorX = layerNode.anchorX;
-        let anchorY = layerNode.anchorY;
-        let moveX = -layerNode.width * anchorX;
-        let moveY = -layerNode.height * anchorY;
+        let mats = comp.sharedMaterials, curMaterial = null;
+        let moveX = comp._leftDownToCenterX;
+        let moveY = comp._leftDownToCenterY;
+        let layerMat = layerNode._worldMatrix;
 
         let vertices = comp._vertices;
         let rowData, col, cols, row, rows, colData, tileSize,
@@ -191,11 +209,6 @@ let tmxAssembler = {
         let left = 0, bottom = 0, right = 0, top = 0; // x, y
         let tiledNode = null, curTexIdx = -1, matIdx;
         let ul, ur, vt, vb;// u, v
-
-        let renderDataList = comp._renderDataList;
-        renderDataList.reset();
-        let renderData = renderDataList.popRenderData(buffer._vb, buffer._ib, 0, 0);
-        let ia = renderData.ia;
         let colNodesCount = 0, checkColRange = true;
 
         let flush = function () {
@@ -203,11 +216,11 @@ let tmxAssembler = {
                 return;
             }
 
-            buffer.uploadData();
             renderer._flushIA(renderData);
 
             let needSwitchBuffer = fillGrids >= maxGridsLimit;
             if (needSwitchBuffer) {
+                buffer.uploadData();
                 buffer.switchBuffer();
                 renderData = renderDataList.popRenderData(buffer._vb, buffer._ib, 0, 0);
                 ia = renderData.ia;
@@ -217,6 +230,7 @@ let tmxAssembler = {
                 renderData = renderDataList.popRenderData(buffer._vb, buffer._ib, buffer.indiceOffset, 0);
                 ia = renderData.ia;
             }
+            renderData.material = curMaterial;
         }
 
         let renderNodes = function (nodeRow, nodeCol) {
@@ -230,7 +244,7 @@ let tmxAssembler = {
                 node = nodesList[oldIdx];
                 oldIdx++;
                 if (!node) continue;
-                RenderFlow.visitRootNode(node);
+                _visitUserNode(node, layerMat, moveX, moveY);
                 if (newIdx !== oldIdx) {
                     nodesList[newIdx] = node;
                     node._index_ = newIdx;
@@ -248,9 +262,8 @@ let tmxAssembler = {
             rows = rightTop.row;
         }
 
-        rows += rowMoveDir;
         // traverse row
-        for (; row != rows; row += rowMoveDir) {
+        for (; (rows - row) * rowMoveDir >= 0; row += rowMoveDir) {
             rowData = vertices[row];
             colNodesCount = comp._getNodesCountByRow(row);
             checkColRange = (colNodesCount == 0 && rowData != undefined);
@@ -264,9 +277,8 @@ let tmxAssembler = {
                 cols = checkColRange && leftDown.col < rowData.minCol ? rowData.minCol : leftDown.col;
             }
 
-            cols += colMoveDir;
             // traverse col
-            for (; col != cols; col += colMoveDir) {
+            for (; (cols - col) * colMoveDir >= 0; col += colMoveDir) {
                 colData = rowData && rowData[col];
                 if (!colData) {
                     // only render users nodes because map data is empty
@@ -286,14 +298,14 @@ let tmxAssembler = {
                     // update material
                     curTexIdx = grid.texId;
                     matIdx = texIdToMatIdx[curTexIdx];
-                    material = mats[matIdx];
-                    renderData.material = material;
+                    curMaterial = mats[matIdx];
+                    renderData.material = curMaterial;
                 }
-                if (!material) continue;
+                if (!curMaterial) continue;
 
                 // calc rect vertex
-                left = colData.left + moveX;
-                bottom = colData.bottom + moveY;
+                left = colData.left - moveX;
+                bottom = colData.bottom - moveY;
                 tileSize = grid.tileset._tileSize;
                 right = left + tileSize.width;
                 top = bottom + tileSize.height;
@@ -321,7 +333,7 @@ let tmxAssembler = {
                     vbuf[vfOffset + 16] = bottom;
                     uintbuf[vfOffset + 19] = color;
                 } else {
-                    this.fillByTiledNode(tiledNode.node, layerNode, vbuf, uintbuf, vfOffset, left, right, top, bottom);
+                    this.fillByTiledNode(tiledNode.node, layerMat, vbuf, uintbuf, vfOffset, left, right, top, bottom);
                 }
 
                 TiledMap.flipTexture(_tempUV, grid, gid);
@@ -363,19 +375,21 @@ let tmxAssembler = {
             }
         }
 
+        // upload buffer data
+        buffer.uploadData();
+
         // last flush
         if (ia._count > 0) {
-            buffer.uploadData();
             renderer._flushIA(renderData);
         }
     },
 
-    fillByTiledNode (tiledNode, layerNode, vbuf, uintbuf, vfOffset, left, right, top, bottom) {
+    fillByTiledNode (tiledNode, layerMat, vbuf, uintbuf, vfOffset, left, right, top, bottom) {
         tiledNode._updateLocalMatrix();
         mat4.copy(_mat4_temp, tiledNode._matrix);
         vec3.set(_vec3_temp, -left, -bottom, 0);
         mat4.translate(_mat4_temp, _mat4_temp, _vec3_temp);
-        mat4.mul(_mat4_temp, layerNode._worldMatrix, _mat4_temp);
+        mat4.mul(_mat4_temp, layerMat, _mat4_temp);
         let a = _mat4_temp.m00;
         let b = _mat4_temp.m01;
         let c = _mat4_temp.m04;
