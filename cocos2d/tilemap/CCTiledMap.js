@@ -561,8 +561,8 @@ let TiledMap = cc.Class({
             let tilesetInfo = tilesets[i];
             if (!tilesetInfo) continue;
             cc.TiledMap.fillTextureGrids(tilesetInfo, texGrids, i);
-            cc.TiledMap.fillAniGrids(texGrids, animations);
         }
+        cc.TiledMap.fillAniGrids(texGrids, animations);
 
         let mapInfo = this._mapInfo;
         let layers = this._layers;
@@ -686,7 +686,7 @@ let TiledMap = cc.Class({
                 }
                 frame = frames[animation.frameIdx];
             }
-            texGrids[frame.tileid] = frame.grid;
+            texGrids[aniGID] = frame.grid;
         }
     },
 });
@@ -755,7 +755,7 @@ cc.TiledMap.loadAllTextures = function (textures, loadedCallback) {
 };
 
 cc.TiledMap.fillAniGrids = function (texGrids, animations) {
-    for (let i = 0; i < animations.length; i++) {
+    for (let i in animations) {
         let animation = animations[i];
         if (!animation) continue;
         let frames = animation.frames;
@@ -829,12 +829,6 @@ cc.TiledMap.flipTexture = function (outGrid, inGrid, gid) {
     outGrid.t = inGrid.t;
 
     let tempVal = 0;
-    // diagonal
-    if ((gid & TileFlag.DIAGONAL) >>> 0) {
-        tempVal = inGrid.r;
-        outGrid.r = inGrid.b;
-        outGrid.b = tempVal;
-    }
 
     // flip x
     if ((gid & TileFlag.HORIZONTAL) >>> 0) {

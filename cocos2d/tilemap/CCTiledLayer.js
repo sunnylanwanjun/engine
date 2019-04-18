@@ -25,6 +25,7 @@
  ****************************************************************************/
 const RenderComponent = require('../core/components/CCRenderComponent');
 const Material = require('../core/assets/material/CCMaterial');
+const RenderFlow = require('../core/renderer/render-flow');
 
 import { mat4, vec2 } from '../core/vmath';
 let _mat4_temp = mat4.create();
@@ -156,10 +157,14 @@ let TiledLayer = cc.Class({
             cc.warn("CCTiledLayer:insertUserNode node has insert");
             return;
         }
+
         node._nodeId_ = this._userNodeId;
         node._row_ = -1;
         node._col_ = -1;
         node._tiledLayer_ = this;
+        node.parent = this.node;
+        node._renderFlag |= RenderFlow.FLAG_BREAK_FLOW;
+
         this._userNodeMap[node._nodeId_] = node;
 
         let tempRowCol = this._tempRowCol;
@@ -197,6 +202,8 @@ let TiledLayer = cc.Class({
         node._row_ = null;
         node._col_ = null;
         node._nodeId_ = null;
+        node.removeFromParent(true);
+        node._renderFlag &= ~RenderFlow.FLAG_BREAK_FLOW;
     },
 
     /**
@@ -264,7 +271,7 @@ let TiledLayer = cc.Class({
     _userNodePosChange () {
         let node = this;
         let self = node._tiledLayer_;
-        let tempRowCol = this._tempRowCol;
+        let tempRowCol = self._tempRowCol;
         self._positionToRowCol(node.x, node.y, tempRowCol);
         // users pos not change
         if (tempRowCol.row === node._row_ && tempRowCol.col === node._col_) return;

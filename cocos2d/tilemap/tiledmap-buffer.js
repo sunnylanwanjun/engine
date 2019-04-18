@@ -56,6 +56,7 @@ let TiledMapBuffer = cc.Class({
     adjust (vertexCount, indiceCount) {
         this.vertexOffset += vertexCount;
         this.indiceOffset += indiceCount;
+        this.indiceStart = this.indiceOffset;
         this.byteOffset = this.byteOffset + vertexCount * this._vertexBytes;
         this._dirty = true;
     }

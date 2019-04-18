@@ -88,8 +88,9 @@ function _visitUserNode (userNode, layerMat, moveX, moveY) {
     mat4.mul(userNode._worldMatrix, layerMat, userNode._matrix);
     vec3.set(_vec3_temp, -moveX, -moveY, 0);
     mat4.translate(userNode._worldMatrix, userNode._worldMatrix, _vec3_temp);
-    userNode._renderFlag &= ~RenderFlow.FLAG_WORLD_TRANSFORM;
+    userNode._renderFlag &= ~(RenderFlow.FLAG_TRANSFORM | RenderFlow.FLAG_BREAK_FLOW);
     RenderFlow.visitRootNode(userNode);
+    userNode._renderFlag |= RenderFlow.FLAG_BREAK_FLOW;
 }
 
 let tmxAssembler = {
@@ -105,7 +106,7 @@ let tmxAssembler = {
         if (vertices.length === 0 ) return;
 
         let buffer = comp._buffer;
-        // if (comp._isClipDirty() || comp._isUserNodeDirty() || comp._hasAnimation()) {
+        if (comp._isClipDirty() || comp._isUserNodeDirty() || comp._hasAnimation()) {
             buffer.reset();
 
             let leftDown, rightTop;
@@ -144,36 +145,39 @@ let tmxAssembler = {
             comp._setClipDirty(false);
             comp._setUserNodeDirty(false);
 
-            // avoid other assembler call model batcher flush func 
-            // or will  draw custom ia twice
-            buffer.reset();
+        } else {
+            let renderDataList = comp._renderDataList;
+            let renderData = null;
+            let nodesRenderList = null;
+            let nodesList = null;
 
-        // } else {
-        //     let renderDataList = comp._renderDataList;
-        //     let renderData = null;
-        //     let nodesRenderList = null;
-        //     let nodesList = null;
+            let moveX = comp._leftDownToCenterX;
+            let moveY = comp._leftDownToCenterY;
+            let layerNode = comp.node;
+            let layerMat = layerNode._worldMatrix;
 
-        //     let moveX = comp._leftDownToCenterX;
-        //     let moveY = comp._leftDownToCenterY;
-
-        //     for (let i = 0; i < renderDataList._offset; i++) {
-        //         renderData = renderDataList._dataList[i];
-        //         if (renderData.ia._count > 0) {
-        //             renderer._flushIA(renderData);
-        //         }
-        //         nodesRenderList = renderData.nodesRenderList;
-        //         for (let j = 0; j < nodesRenderList.length; j++) {
-        //             nodesList = nodesRenderList[j];
-        //             if (!nodesList) continue;
-        //             for (let idx = 0; idx < nodesList.length; idx++) {
-        //                 node = nodesList[idx];
-        //                 if (!node) continue;
-        //                 RenderFlow.visitRootNode(node, layerMat, moveX, moveY);
-        //             }
-        //         }
-        //     }
-        // }
+            for (let i = 0; i < renderDataList._offset; i++) {
+                renderData = renderDataList._dataList[i];
+                if (renderData.ia._count > 0) {
+                    renderer._flushIA(renderData);
+                }
+                nodesRenderList = renderData.nodesRenderList;
+                if (nodesRenderList.length === 0) continue;
+                renderer.worldMatDirty++;
+                for (let j = 0; j < nodesRenderList.length; j++) {
+                    nodesList = nodesRenderList[j];
+                    if (!nodesList) continue;
+                    for (let idx = 0; idx < nodesList.length; idx++) {
+                        node = nodesList[idx];
+                        if (!node) continue;
+                        _visitUserNode(node, layerMat, moveX, moveY);
+                    }
+                }
+                renderer.worldMatDirty++;
+                renderer._flush();
+                renderer.node = layerNode;
+            }
+        }
     },
 
     // rowMoveDir is -1 or 1, -1 means decrease, 1 means increase
@@ -211,6 +215,7 @@ let tmxAssembler = {
         let ul, ur, vt, vb;// u, v
         let colNodesCount = 0, checkColRange = true;
 
+        // flush map data inner function
         let flush = function () {
             if (ia._count === 0) {
                 return;
@@ -233,13 +238,18 @@ let tmxAssembler = {
             renderData.material = curMaterial;
         }
 
+        // render user nodes inner function
         let renderNodes = function (nodeRow, nodeCol) {
             let nodesInfo = comp._getNodesByRowCol(nodeRow, nodeCol);
             if (!nodesInfo || nodesInfo.count == 0) return;
             let nodesList = nodesInfo.list;
             let newIdx = 0, oldIdx = 0;
             renderData.nodesRenderList.push(nodesList);
+            // flush map render data
             flush();
+            
+            renderer.worldMatDirty++;
+            // begin to render nodes
             for (; newIdx < nodesInfo.count; ) {
                 node = nodesList[oldIdx];
                 oldIdx++;
@@ -252,6 +262,11 @@ let tmxAssembler = {
                 newIdx++;
             }
             nodesList.length = newIdx;
+            renderer.worldMatDirty--;
+
+            // flush user nodes render data
+            renderer._flush();
+            renderer.node = layerNode;
         }
 
         if (rowMoveDir == -1) {
@@ -347,13 +362,24 @@ let tmxAssembler = {
                 vbuf[vfOffset + 2] = ul;
                 vbuf[vfOffset + 3] = vt;
 
-                // bl
-                vbuf[vfOffset + 7] = ul;
-                vbuf[vfOffset + 8] = vb;
+                // diagonal
+                if ((gid & TileFlag.DIAGONAL) >>> 0) {
+                    // bl
+                    vbuf[vfOffset + 7] = ur;
+                    vbuf[vfOffset + 8] = vt;
 
-                // tr
-                vbuf[vfOffset + 12] = ur;
-                vbuf[vfOffset + 13] = vt;
+                    // tr
+                    vbuf[vfOffset + 12] = ul;
+                    vbuf[vfOffset + 13] = vb;
+                } else {
+                    // bl
+                    vbuf[vfOffset + 7] = ul;
+                    vbuf[vfOffset + 8] = vb;
+
+                    // tr
+                    vbuf[vfOffset + 12] = ur;
+                    vbuf[vfOffset + 13] = vt;
+                }
 
                 // br
                 vbuf[vfOffset + 17] = ur;
