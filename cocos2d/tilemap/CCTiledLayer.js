@@ -354,14 +354,10 @@ let TiledLayer = cc.Class({
 
     onDestroy () {
         this._super();
-        // if (this._renderDataList) {
-        //     this._renderDataList.reset();
-        //     this._renderDataList = null;
-        // }
-        // if (this._buffer) {
-        //     this._buffer.destroy();
-        //     this._buffer = null;
-        // }
+        if (this._buffer) {
+            this._buffer.destroy();
+            this._buffer = null;
+        }
     },
 
     __preload () {

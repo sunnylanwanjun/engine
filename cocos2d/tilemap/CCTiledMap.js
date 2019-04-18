@@ -577,18 +577,14 @@ let TiledMap = cc.Class({
                 let name = layerInfo.name;
 
                 let child = this.node.getChildByName(name);
-                if (!layerInfo.visible) {
-                    if (child) {
-                        child.removeFromParent(true);
-                    }
-                    continue;
-                }
 
                 if (!child) {
                     child = new cc.Node();
                     child.name = name;
                     node.addChild(child);
                 }
+
+                child.active = layerInfo.visible;
 
                 if (layerInfo instanceof cc.TMXLayerInfo) {
                     let layer = child.getComponent(cc.TiledLayer);

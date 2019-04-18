@@ -36,7 +36,7 @@ const vfmtPosUvColor = require('../core/renderer/webgl/vertex-format').vfmtPosUv
 import InputAssembler from '../renderer/core/input-assembler';
 
 const Orientation = TiledMap.Orientation;
-const maxGridsLimit = parseInt(65535 / 4);
+const maxGridsLimit = parseInt(65535 / 6);
 
 import { mat4, vec3 } from '../core/vmath';
 
@@ -223,7 +223,7 @@ let tmxAssembler = {
 
             renderer._flushIA(renderData);
 
-            let needSwitchBuffer = fillGrids >= maxGridsLimit;
+            let needSwitchBuffer = (fillGrids >= maxGridsLimit);
             if (needSwitchBuffer) {
                 buffer.uploadData();
                 buffer.switchBuffer();

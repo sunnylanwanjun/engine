@@ -340,6 +340,7 @@ cc.TMXMapInfo = function (tmxFile, tsxMap, textures, imageLayerTextures) {
     this.storingCharacters = false;
     this.currentString = null;
 
+    this._supportVersion = [1, 2, 0];
     this._parser = new cc.SAXParser();
     this._objectGroups = [];
     this._allChildren = [];
@@ -685,15 +686,23 @@ cc.TMXMapInfo.prototype = {
         // PARSE <map>
         let map = mapXML.documentElement;
 
-        let version = map.getAttribute('version');
         let orientationStr = map.getAttribute('orientation');
         let staggerAxisStr = map.getAttribute('staggeraxis');
         let staggerIndexStr = map.getAttribute('staggerindex');
         let hexSideLengthStr = map.getAttribute('hexsidelength');
+        let version = map.getAttribute('version') || '1.0.0';
 
         if (map.nodeName === "map") {
-            if (version !== "1.0" && version !== null)
-                cc.logID(7216, version);
+            let versionArr = version.split('.');
+            let supportVersion = this._supportVersion;
+            for (let i = 0; i < supportVersion.length; i++) {
+                let v = parseInt(versionArr[i]) || 0;
+                let sv = supportVersion[i];
+                if (sv < v) {
+                    cc.logID(7216, version);
+                    break;
+                }
+            }   
 
             if (orientationStr === "orthogonal")
                 this.orientation = cc.TiledMap.Orientation.ORTHO;
