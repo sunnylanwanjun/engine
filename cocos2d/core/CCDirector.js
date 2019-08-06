@@ -194,6 +194,14 @@ cc.Director.prototype = {
         }
 
         // physics manager
+        if (cc.Physics3DManager) {
+            this._physics3DManger = new cc.Physics3DManager();
+            this._scheduler.scheduleUpdate(this._physics3DManger, Scheduler.PRIORITY_SYSTEM, false);
+        } else {
+            this._physics3DManger = null;
+        }
+
+        // physics manager
         if (cc.PhysicsManager) {
             this._physicsManager = new cc.PhysicsManager();
             this._scheduler.scheduleUpdate(this._physicsManager, Scheduler.PRIORITY_SYSTEM, false);
@@ -391,6 +399,10 @@ cc.Director.prototype = {
         // Physics manager
         if (this._physicsManager) {
             this._scheduler.scheduleUpdate(this._physicsManager, cc.Scheduler.PRIORITY_SYSTEM, false);
+        }
+
+        if (this._physics3DManger) {
+            this._scheduler.scheduleUpdate(this._physics3DManger, cc.Scheduler.PRIORITY_SYSTEM, false);
         }
 
         cc.game.resume();
@@ -875,6 +887,16 @@ cc.Director.prototype = {
      */
     getPhysicsManager: function () {
         return this._physicsManager;
+    },
+
+    /**
+     * !#en Returns the cc.Physics3DManager associated with this director.
+     * !#zh 返回与 director 相关联的 cc.Physics3DManager （3D物理管理器）。
+     * @method getPhysics3DManager
+     * @return {Physics3DManager}
+     */
+    getPhysics3DManager: function () {
+        return this._physics3DManager;
     },
 
     // Loop management

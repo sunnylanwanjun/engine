@@ -343,6 +343,14 @@ module.exports = {
             'alphaThreshold': 'The alpha threshold，The content is drawn only where the stencil have pixel with alpha greater than the alphaThreshold (Not supported Canvas Mode)',
             'segements': 'The segements for ellipse mask'
         },
+        'physics3d': {
+            'rigidbody': {
+                
+            },
+            'collider': {
+                'isTrigger': '',
+            }
+        },
         'physics': {
             'rigidbody': {
                 'enabledContactListener': 'Should enabled contact listener. When a collision is trigger, the collision callback will only be called when enabled contact listener.',

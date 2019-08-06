@@ -347,6 +347,14 @@ module.exports = {
             'alphaThreshold': 'Alpha阈值，只有当模板的像素的 alpha 大于 alphaThreshold 时，才会绘制内容（不支持 Canvas 模式）',
             'segements': '椭圆遮罩的曲线细分数'
         },
+        'physics3D': {
+            'rigidbody': {
+
+            },
+            'collider': {
+                
+            }
+        },
         'physics': {
             'rigidbody': {
                 'enabledContactListener': '是否启用接触接听器。当 collider 产生碰撞时，只有开启了接触接听器才会调用相应的回调函数',

@@ -4,6 +4,8 @@ if (!CC_TEST && (!CC_EDITOR || !Editor.isMainProcess)) {
     require('./primitive');
 }
 
+require("./physics");
+
 require('./CCModel');
 require('./skeleton/CCSkeleton');
 require('./skeleton/CCSkeletonAnimationClip');
