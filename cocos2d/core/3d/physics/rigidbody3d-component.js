@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 let RigidBody3DComponent = cc.Class({
-    
+    editor: CC_EDITOR && {
+        executeInEditMode: true,
+        disallowMultiple: true
+    },
 });
 module.exports = cc.RigidBody3DComponent = RigidBody3DComponent;

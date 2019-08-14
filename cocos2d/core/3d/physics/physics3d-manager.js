@@ -57,8 +57,8 @@ let Physics3DManager = cc.Class({
 
     init (isCollisionOnly) {
 
-        this._vector3Zero = new ammo.btVector3(0,0,0);
-		this._quaternion = new ammo.btQuaternion(0,0,0,-1);
+        let vec30 = this._vector3Zero = new ammo.btVector3(0, 0, 0);
+		this._quaternion = new ammo.btQuaternion(0, 0, 0, 1);
 
         this._collisionConfiguration = new ammo.btDefaultCollisionConfiguration();
 		this._dispatcher = new ammo.btCollisionDispatcher(this._collisionConfiguration);
@@ -66,7 +66,7 @@ let Physics3DManager = cc.Class({
         this._broadphase.getOverlappingPairCache().setInternalGhostPairCallback(new ammo.btGhostPairCallback());
         
         if (!isCollisionOnly) {
-            let solver = new ammo.btSequentialImpulseConstraintSolver();
+            let solver = this._solver = new ammo.btSequentialImpulseConstraintSolver();
             this._discreteDynamicsWorld = new ammo.btDiscreteDynamicsWorld(this._dispatcher, this._broadphase, solver, this._collisionConfiguration);
             this._collisionWorld = this._discreteDynamicsWorld;
 
@@ -76,20 +76,20 @@ let Physics3DManager = cc.Class({
             this._collisionWorld = new ammo.btCollisionWorld(this._dispatcher, this._broadphase, this._collisionConfiguration);
         }
 
-        this._closestRayResultCallback = new ammo.ClosestRayResultCallback(this._vector3Zero,this._vector3Zero);
-		this._allHitsRayResultCallback = new ammo.AllHitsRayResultCallback(this._vector3Zero,this._vector3Zero);
-		this._closestConvexResultCallback = new ammo.ClosestConvexResultCallback(this._vector3Zero,this._vector3Zero);
-		this._allConvexResultCallback = new ammo.AllConvexResultCallback(this._vector3Zero,this._vector3Zero);
+        this._closestRayResultCallback = new ammo.ClosestRayResultCallback(vec30, vec30);
+		this._allHitsRayResultCallback = new ammo.AllHitsRayResultCallback(vec30, vec30);
+		this._closestConvexResultCallback = new ammo.ClosestConvexResultCallback(vec30, vec30);
+		this._allConvexResultCallback = new ammo.AllConvexResultCallback(vec30, vec30);
 		ammo._btGImpactCollisionAlgorithm_RegisterAlgorithm(this._dispatcher.a);
     },
 
     destroy () {
 		if (this._discreteDynamicsWorld) {
 			ammo.destroy(this._discreteDynamicsWorld);
-			this._discreteDynamicsWorld=null;
+			this._discreteDynamicsWorld = null;
 		} else if (this._collisionWorld) {
             ammo.destroy(this._collisionWorld);
-			this._collisionWorld=null;
+			this._collisionWorld = null;
         }
         
         if (this._broadphase) {
@@ -106,21 +106,56 @@ let Physics3DManager = cc.Class({
             ammo.destroy(this._collisionConfiguration);
             this._collisionConfiguration = null;
         }
+
+        if (this._solver) {
+            ammo.destroy(this._solver);
+            this._solver = null;
+        }
+
+        if (this._closestRayResultCallback) {
+            ammo.destroy(this._closestRayResultCallback);
+            this._closestRayResultCallback = null;
+        }
+
+        if (this._allHitsRayResultCallback) {
+            ammo.destroy(this._allHitsRayResultCallback);
+            this._allHitsRayResultCallback = null;
+        }
+
+        if (this._closestConvexResultCallback) {
+            ammo.destroy(this._closestConvexResultCallback);
+            this._closestConvexResultCallback = null;
+        }
+
+        if (this._allConvexResultCallback) {
+            ammo.destroy(this._allConvexResultCallback);
+            this._allConvexResultCallback = null;
+        }
+
+        if (this._vector3Zero) {
+            ammo.destroy(this._vector3Zero);
+            this._vector3Zero = null;
+        }
+
+        if (this._quaternion) {
+            ammo.destroy(this._quaternion);
+            this._quaternion = null;
+        }
     },
 
     _simulator (dt) {
         if (this._discreteDynamicsWorld) {
             this._discreteDynamicsWorld.stepSimulation(dt, this.maxSubStep, this.fixedTimeStep);
         } else {
-            this._collisionWorld.PerformDiscreteCollisionDetection();
+            this._collisionWorld.performDiscreteCollisionDetection();
         }
     },
 
     _updatePhysicsTransform () {
         for (let i = 0; i < this._transformList.length; i++) {
-            let comp = this._transformList[i];
-            comp._inTransformList = false;
-            comp._updatePhysicsTransform();
+            let object = this._transformList[i];
+            object._inTransformList = false;
+            object._updatePhysicsTransform();
         }
         this._transformList.length = 0;
     },
@@ -144,10 +179,19 @@ let Physics3DManager = cc.Class({
         return this._collisionWorld;
     },
 
-    _addToTransformList (physicsComponent) {
-        if (physicsComponent._inTransformList) return;
-        physicsComponent._inTransformList = true;
-        this._transformList.push(physicsComponent);
+    _addToTransformList (physicsObject) {
+        if (physicsObject._inTransformList) return;
+        physicsObject._inTransformList = true;
+        this._transformList.push(physicsObject);
+    },
+
+    _removeFromTransformList (physicsObject) {
+        if (!physicsObject._inTransformList) return;
+        physicsObject._inTransformList = false;
+        let index = this._transformList.indexOf(physicsObject);
+        if (index >= 0) {
+            this._transformList.splice(index, 1);
+        }
     },
 
     _addCollider (collider, group, mask) {

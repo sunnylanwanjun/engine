@@ -21,13 +21,45 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
-
+let ammo = require("./lib/ammo");
 let Collider3DComponent = require("./collider3d-component");
+let _tempBTVec3 = new ammo.btVector3();
 
 let Box3DColliderComponent = cc.Class({
     name : "cc.BoxColliderComponent",
     extends : Collider3DComponent,
 
+    properties: {
+        /**
+         * !#en Collider shape size
+         * !#zh 碰撞器尺寸
+         * @property {cc.Vec3} size
+         * @default cc.v3(0, 0, 0)
+         */
+        _size: null,
+        size: {
+            type: cc.Vec3,
+            get () {
+                return this._size;
+            },
+            set (value) {
+                this._size.x = value.x;
+                this._size.y = value.y;
+                this._size.z = value.z;
+                this._updateShape();
+            },
+        },
+    },
 
+    ctor () {
+        this._size = cc.v3(0, 0, 0);
+    },
+
+    __preload () {
+        this._super();
+        this._updateShape();
+    },
+
+    
 });
 module.exports = cc.Box3DColliderComponent = Box3DColliderComponent;

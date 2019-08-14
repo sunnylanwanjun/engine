@@ -21,18 +21,17 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
+
 const RigidBody3D = require("./rigidbody3d");
-const NodeEvent = require('../CCNode').EventType;
+const Collider3D = require("./collider3d");
 
 let Physics3DBaseComponent = cc.Class({
     name: 'cc.Physics3DBaseComponent',
     extends: cc.Component,
 
     ctor () {
-        this._colliderObject = null;
-        this._inTransformList = false;
-        this._shareBody = null;
-        this._physics3DManger = cc.director.getPhysics3DManager();
+        this._physicsObject = null;
+        this._enablePhysicsObject = false;
     },
 
     /**
@@ -41,8 +40,8 @@ let Physics3DBaseComponent = cc.Class({
      * @param v - 整数，范围为 2 的 0 次方 到 2 的 31 次方
      */
     setGroup (v) {
-        if (this._shareBody) {
-            return this._shareBody.setGroup(v);
+        if (this._physicsObject) {
+            return this._physicsObject.setGroup(v);
         }
     },
 
@@ -52,8 +51,8 @@ let Physics3DBaseComponent = cc.Class({
      * @returns 整数，范围为 2 的 0 次方 到 2 的 31 次方
      */
     getGroup () {
-        if (this._shareBody) {
-            return this._shareBody.getGroup();
+        if (this._physicsObject) {
+            return this._physicsObject.getGroup();
         }
         return 0;
     },
@@ -64,8 +63,8 @@ let Physics3DBaseComponent = cc.Class({
      * @param v - 整数，范围为 2 的 0 次方 到 2 的 31 次方
      */
     addGroup (v) {
-        if (this._shareBody) {
-            return this._shareBody.addGroup(v);
+        if (this._physicsObject) {
+            return this._physicsObject.addGroup(v);
         }
     },
 
@@ -75,8 +74,8 @@ let Physics3DBaseComponent = cc.Class({
      * @param v - 整数，范围为 2 的 0 次方 到 2 的 31 次方
      */
     removeGroup (v) {
-        if (this._shareBody) {
-            return this._shareBody.removeGroup(v);
+        if (this._physicsObject) {
+            return this._physicsObject.removeGroup(v);
         }
     },
 
@@ -86,8 +85,8 @@ let Physics3DBaseComponent = cc.Class({
      * @returns 整数，范围为 2 的 0 次方 到 2 的 31 次方
      */
     getMask () {
-        if (this._shareBody) {
-            return this._shareBody.getMask();
+        if (this._physicsObject) {
+            return this._physicsObject.getMask();
         }
         return 0;
     },
@@ -98,8 +97,8 @@ let Physics3DBaseComponent = cc.Class({
      * @param v - 整数，范围为 2 的 0 次方 到 2 的 31 次方
      */
     setMask (v) {
-        if (this._shareBody) {
-            return this._shareBody.setMask(v);
+        if (this._physicsObject) {
+            return this._physicsObject.setMask(v);
         }
     },
 
@@ -109,8 +108,8 @@ let Physics3DBaseComponent = cc.Class({
      * @param v - 整数，范围为 2 的 0 次方 到 2 的 31 次方
      */
     addMask (v) {
-        if (this._shareBody) {
-            return this._shareBody.addMask(v);
+        if (this._physicsObject) {
+            return this._physicsObject.addMask(v);
         }
     },
 
@@ -120,80 +119,75 @@ let Physics3DBaseComponent = cc.Class({
      * @param v - 整数，范围为 2 的 0 次方 到 2 的 31 次方
      */
     removeMask (v) {
-        if (this._shareBody) {
-            return this._shareBody.removeMask(v);
+        if (this._physicsObject) {
+            return this._physicsObject.removeMask(v);
         }
     },
 
     onEnable () {
-        if (this._shareBody) {
-            this._shareBody.enable();
+        if (this._enablePhysicsObject) return;
+        this._enablePhysicsObject = true;
+        if (this._physicsObject) {
+            this._physicsObject.enable();
         }
-        this._registerNodeEvents();
     },
 
     onDisable () {
-        if (this._shareBody) {
-            this._shareBody.disable();
+        if (!this._enablePhysicsObject) return;
+        this._enablePhysicsObject = false;
+        if (this._physicsObject) {
+            this._physicsObject.disable();
         }
-        this._unregisterNodeEvents();
     },
 
     onDestroy () {
-        if (this._shareBody) {
-            this._shareBody.decRef();
-            this._shareBody = null;
-        }
-    },
-
-    _registerNodeEvents: function () {
-        var node = this.node;
-        node.on(NodeEvent.POSITION_CHANGED, this._toUpdatePhysicsTransform, this);
-        node.on(NodeEvent.ROTATION_CHANGED, this._toUpdatePhysicsTransform, this);
-        node.on(NodeEvent.SCALE_CHANGED, this._toUpdatePhysicsTransform, this);
-    },
-
-    _unregisterNodeEvents: function () {
-        var node = this.node;
-        node.off(NodeEvent.POSITION_CHANGED, this._toUpdatePhysicsTransform, this);
-        node.off(NodeEvent.ROTATION_CHANGED, this._toUpdatePhysicsTransform, this);
-        node.off(NodeEvent.SCALE_CHANGED, this._toUpdatePhysicsTransform, this);
-    },
-
-    _toUpdatePhysicsTransform () {
-        if (this._physics3DManger) {
-            this._physics3DManger._addToTransformList(this);
-        }
-    },
-
-    _updatePhysicsTransform () {
-        if (this._shareBody) {
-            this._shareBody.updatePhysicsTransform();
+        if (this._physicsObject) {
+            this._physicsObject.decRef();
+            this._physicsObject = null;
         }
     },
 
     __preload () {
         if (!CC_EDITOR) return;
 
-        if (this._shareBody == null) {
-            const physicsBaseComponents = this.node.getComponents(Physics3DBaseComponent);
-            let shareBody = null;
-            for (const physicsBasedComponent of physicsBaseComponents) {
-                if (physicsBasedComponent._shareBody) {
-                    shareBody = physicsBasedComponent._shareBody;
+        if (this._physicsObject == null) {
+            const comps = this.node.getComponents(cc.Physics3DBaseComponent);
+            let share = null;
+            for (const comp of comps) {
+                if (comp._physicsObject) {
+                    share = comp._physicsObject;
                     break;
                 }
             }
-            if (!shareBody) {
-                const rigidbody = this.getComponent(cc.RigidBody3DComponent);
-                shareBody = new RigidBody3D();
-                shareBody.init(this.node, rigidbody);
-            }
-            shareBody.incRef();
-            this._shareBody = shareBody;
-        }
 
-        this._toUpdatePhysicsTransform();
+            const hasRigidbody = !!(this instanceof cc.RigidBody3DComponent);
+            let oldShare = null;
+            if (share && hasRigidbody !== share.isRigidBody()) {
+                oldShare = share;
+                share = null;
+            }
+
+            if (!share) {
+                if (hasRigidbody) {
+                    share = new RigidBody3D(this.node);
+                } else {
+                    share = new Collider3D(this.node);
+                }
+
+                if (oldShare) {
+                    share.extract(oldShare);
+                    oldShare.destroy();
+                    oldShare = null;
+                }
+
+                for (const comp of comps) {
+                    comp._physicsObject = share;
+                }
+            }
+
+            this._physicsObject = share;
+            share.incRef();
+        }
     }
 });
 
