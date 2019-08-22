@@ -175,7 +175,7 @@ var DynamicAnimCurve = cc.Class({
         };
     })(),
 
-    sample (time, ratio, state) {
+    commonSample (time, ratio, state) {
         let values = this.values;
         let ratios = this.ratios;
         let frameCount = ratios.length;
@@ -240,14 +240,21 @@ var DynamicAnimCurve = cc.Class({
         }
 
         this.target[this.prop] = value;
-    }
+    },
+
+    fixSample (time, ratio, state) {
+        let frameCount = this.ratios.length;
+        let index = Math.floor(ratio * frameCount);
+        let value = this.values[index];
+        if (!value) return;
+        this.target[this.prop] = value;
+    } 
 });
 
 DynamicAnimCurve.Linear = null;
 DynamicAnimCurve.Bezier = function (controlPoints) {
     return controlPoints;
 };
-
 
 /**
  * Event information,

@@ -226,6 +226,7 @@ var AnimationClip = cc.Class({
             }
         }
 
+        curve.sample = canOptimize ? curve.fixSample : curve.commonSample;
         curve._findFrameIndex = canOptimize ? quickFindIndex : binarySearch;
 
         // find the lerp function
