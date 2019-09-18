@@ -615,12 +615,10 @@ let ArmatureDisplay = cc.Class({
     _activateMaterial () {
         let texture = this.dragonAtlasAsset && this.dragonAtlasAsset.texture;
         if (!texture) {
-            this.disableRender();
             return;
         }
 
         if (!texture.loaded) {
-            this.disableRender();
             texture.once('load', this._activateMaterial, this);
             return;
         }
@@ -642,8 +640,9 @@ let ArmatureDisplay = cc.Class({
         this._prepareToRender();
     },
 
+    // use for jsb
     _prepareToRender () {
-        this.markForRender(true);
+        
     },
 
     _buildArmature () {
