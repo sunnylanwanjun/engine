@@ -126,6 +126,11 @@ const Overflow = cc.Enum({
  * @property {Number} SystemFont
  */
 
+/**
+ * !#en Enum for cache mode.
+ * !#zh CacheMode 类型
+ * @enum Label.CacheMode
+ */
  /**
  * !#en Do not do any caching.
  * !#zh 不做任何缓存。
@@ -168,6 +173,13 @@ let Label = cc.Class({
         this._frame = null;
         this._ttfTexture = null;
         this._letterTexture = null;
+
+        if (cc.game.renderType === cc.game.RENDER_TYPE_CANVAS) {
+            this._activateMaterial = this._activateMaterialCanvas;
+        }
+        else {
+            this._activateMaterial = this._activateMaterialWebgl;
+        }
     },
 
     editor: CC_EDITOR && {
@@ -525,17 +537,15 @@ let Label = cc.Class({
         // Keep track of Node size
         this.node.on(cc.Node.EventType.SIZE_CHANGED, this._lazyUpdateRenderData, this);
         this.node.on(cc.Node.EventType.ANCHOR_CHANGED, this._lazyUpdateRenderData, this);
-        this.node.on(cc.Node.EventType.COLOR_CHANGED, this._updateColor, this);
 
-        this._checkStringEmpty();
         this._forceUpdateRenderData();
+        this._checkStringEmpty();
     },
 
     onDisable () {
         this._super();
         this.node.off(cc.Node.EventType.SIZE_CHANGED, this._lazyUpdateRenderData, this);
         this.node.off(cc.Node.EventType.ANCHOR_CHANGED, this._lazyUpdateRenderData, this);
-        this.node.off(cc.Node.EventType.COLOR_CHANGED, this._updateColor, this);
     },
 
     onDestroy () {
@@ -553,7 +563,7 @@ let Label = cc.Class({
         if (!(this.font instanceof cc.BitmapFont)) {
             this._lazyUpdateRenderData();
         }
-        this._assembler.updateColor(this);
+       RenderComponent.prototype._updateColor.call(this);
     },
 
     _canRender () {
@@ -632,36 +642,38 @@ let Label = cc.Class({
         }
     },
 
-    _activateMaterial (force) {
+    _activateMaterialCanvas (force) {
         if (!force) return;
 
-        // Canvas
-        if (cc.game.renderType === cc.game.RENDER_TYPE_CANVAS) {
-            this._frame._texture.url = this.uuid + '_texture';
+        this._frame._texture.url = this.uuid + '_texture';
+
+        this.markForUpdateRenderData(true);
+        this.markForRender(true);
+    },
+
+    _activateMaterialWebgl (force) {
+        if (!force) return;
+
+
+        // If frame not create, disable render and return.
+        if (!this._frame) {
+            this.disableRender();
+            return;
         }
-        // WebGL
+
+        // Label's texture is generated dynamically,
+        // we should always get a material instance for this label.
+        let material = this.sharedMaterials[0];
+
+        if (!material) {
+            material = Material.getInstantiatedBuiltinMaterial('2d-sprite', this);
+        }
         else {
-
-            // If frame not create, disable render and return.
-            if (!this._frame) {
-                this.disableRender();
-                return;
-            }
-
-            // Label's texture is generated dynamically,
-            // we should always get a material instance for this label.
-            let material = this.sharedMaterials[0];
-
-            if (!material) {
-                material = Material.getInstantiatedBuiltinMaterial('2d-sprite', this);
-            }
-            else {
-                material = Material.getInstantiatedMaterial(material, this);
-            }
-
-            material.setProperty('texture', this._frame._texture);
-            this.setMaterial(0, material);
+            material = Material.getInstantiatedMaterial(material, this);
         }
+
+        material.setProperty('texture', this._frame._texture);
+        this.setMaterial(0, material);
 
         this.markForUpdateRenderData(true);
         this.markForRender(true);

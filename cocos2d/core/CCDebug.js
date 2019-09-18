@@ -23,6 +23,7 @@
  THE SOFTWARE.
  ****************************************************************************/
 
+const utils = require('./platform/utils');
 const debugInfos = require('../../DebugInfos') || {};
 const ERROR_MAP_URL = 'https://github.com/cocos-creator/engine/blob/master/EngineErrorMap.md';
 
@@ -211,13 +212,9 @@ let resetDebugSetting = function (mode) {
 };
 
 cc._throw = CC_EDITOR ? Editor.error : function (error) {
-    var stack = error.stack;
-    if (stack) {
-        cc.error(CC_JSB || CC_RUNTIME ? (error + '\n' + stack) : stack);
-    }
-    else {
-        cc.error(error);
-    }
+    utils.callInNextTick(function () {
+        throw error;
+    });
 };
 
 function getTypedFormatter (type) {
@@ -343,7 +340,7 @@ module.exports = cc.debug = {
      * !#en Gets error message with the error id and possible parameters.
      * !#zh 通过 error id 和必要的参数来获取错误信息。
      * @method getError
-     * @param {id} errorId
+     * @param {String} errorId
      * @param {any} [param]
      * @return {String}
      */

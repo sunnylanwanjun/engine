@@ -113,8 +113,8 @@ var Slider = cc.Class({
         },
 
         /**
-         * !#en The slider events callback
-         * !#zh 滑动器组件事件回调函数
+         * !#en The slider slide events' callback array
+         * !#zh 滑动器组件滑动事件回调函数数组
          * @property {Component.EventHandler[]} slideEvents
          */
         slideEvents: {
@@ -203,12 +203,13 @@ var Slider = cc.Class({
 
     _updateProgress: function (touch) {
         if (!this.handle) { return; }
-        var localTouchPos = this.node.convertToNodeSpace(touch.getLocation());
+        let node = this.node;
+        var localTouchPos = node.convertToNodeSpaceAR(touch.getLocation());
         if (this.direction === Direction.Horizontal) {
-            this.progress = misc.clamp01((localTouchPos.x - this._offset.x) / this.node.width);
+            this.progress = misc.clamp01((localTouchPos.x - this._offset.x + node.anchorX * node.width) / node.width);
         }
         else {
-            this.progress = misc.clamp01((localTouchPos.y - this._offset.y) / this.node.height);
+            this.progress = misc.clamp01((localTouchPos.y - this._offset.y + node.anchorY * node.height) / node.height);
         }
     },
 

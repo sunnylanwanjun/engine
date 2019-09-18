@@ -1042,7 +1042,7 @@ let NodeDefines = {
                     if (CC_JSB && CC_NATIVERENDERER) {
                         this._proxy.updateOpacity();
                     };
-                    this._renderFlag |= RenderFlow.FLAG_OPACITY;
+                    this._renderFlag |= RenderFlow.FLAG_OPACITY_COLOR;
                 }
             },
             range: [0, 255]
@@ -1066,6 +1066,8 @@ let NodeDefines = {
                     if (CC_DEV && value.a !== 255) {
                         cc.warnID(1626);
                     }
+
+                    this._renderFlag |= RenderFlow.FLAG_COLOR;
 
                     if (this._eventMask & COLOR_ON) {
                         this.emit(EventType.COLOR_CHANGED, value);
@@ -1258,7 +1260,7 @@ let NodeDefines = {
             this._proxy.init(this);
         }
         else {
-            this._renderFlag = RenderFlow.FLAG_TRANSFORM | RenderFlow.FLAG_OPACITY;
+            this._renderFlag = RenderFlow.FLAG_TRANSFORM | RenderFlow.FLAG_OPACITY_COLOR;
         }
     },
 
@@ -1458,46 +1460,12 @@ let NodeDefines = {
             trs = this._trs = this._spaceInfo.trs;
         }
 
-        // Upgrade _position from v2
-        // TODO: remove in future version, 3.0 ?
-        if (this._position !== undefined) {
-            trs[0] = this._position.x;
-            trs[1] = this._position.y;
-            trs[2] = this._position.z;
-            this._position = undefined;
-        }
-
         if (this._zIndex !== undefined) {
             this._localZOrder = this._zIndex << 16;
             this._zIndex = undefined;
         }
 
-        // TODO: remove _rotationX & _rotationY in future version, 3.0 ?
-        // Update eulerAngles from rotation, when upgrade from 1.x to 2.0
-        // If rotation x & y is 0 in old version, then update rotation from default quaternion is ok too
-        let eulerAngles = this._eulerAngles;
-        if ((this._rotationX || this._rotationY) &&
-            (eulerAngles.x === 0 && eulerAngles.y === 0 && eulerAngles.z === 0)) {
-            if (this._rotationX === this._rotationY) {
-                eulerAngles.z = -this._rotationX;
-            }
-            else {
-                eulerAngles.x = this._rotationX;
-                eulerAngles.y = this._rotationY;
-            }
-            this._rotationX = this._rotationY = undefined;
-        }
-
         this._fromEuler();
-
-        // Upgrade _scale from v2
-        // TODO: remove in future version, 3.0 ?
-        if (this._scale !== undefined) {
-            trs[7] = this._scale.x;
-            trs[8] = this._scale.y;
-            trs[9] = this._scale.z;
-            this._scale = undefined;
-        }
 
         if (this._localZOrder !== 0) {
             this._zIndex = (this._localZOrder & 0xffff0000) >> 16;
@@ -1511,7 +1479,7 @@ let NodeDefines = {
         }
 
         if (CC_JSB && CC_NATIVERENDERER) {
-            this._renderFlag |= RenderFlow.FLAG_TRANSFORM | RenderFlow.FLAG_OPACITY;
+            this._renderFlag |= RenderFlow.FLAG_TRANSFORM | RenderFlow.FLAG_OPACITY_COLOR;
         }
     },
 
@@ -1774,12 +1742,8 @@ let NodeDefines = {
         if ( !listeners.hasEventListener(type, callback, target) ) {
             listeners.on(type, callback, target);
 
-            if (target) {
-                if (target.__eventTargets) {
-                    target.__eventTargets.push(this);
-                } else if (target.node && target.node.__eventTargets) {
-                    target.node.__eventTargets.push(this);
-                }
+            if (target && target.__eventTargets) {
+                target.__eventTargets.push(this);
             }
         }
 
@@ -1866,12 +1830,8 @@ let NodeDefines = {
             if (listeners) {
                 listeners.off(type, callback, target);
 
-                if (target) {
-                    if (target.__eventTargets) {
-                        js.array.fastRemove(target.__eventTargets, this);
-                    } else if (target.node && target.node.__eventTargets) {
-                        js.array.fastRemove(target.node.__eventTargets, this);
-                    }
+                if (target && target.__eventTargets) {
+                    js.array.fastRemove(target.__eventTargets, this);
                 }
             }
 
@@ -2025,7 +1985,7 @@ let NodeDefines = {
         
         let camera = cc.Camera.findCamera(this);
         if (camera) {
-            camera.getCameraToWorldPoint(point, cameraPt);
+            camera.getScreenToWorldPoint(point, cameraPt);
         }
         else {
             cameraPt.set(point);
@@ -2699,7 +2659,10 @@ let NodeDefines = {
         else {
             quat.copy(_swrQuat, val);
         }
-        this._toEuler();
+        trs.fromRotation(this._trs, _swrQuat);
+        if (CC_EDITOR) {
+            this._toEuler();
+        }
         this.setLocalDirty(LocalDirtyFlag.ROTATION);
     },
 
@@ -2946,6 +2909,59 @@ let NodeDefines = {
     },
 
     /**
+     * !#en
+     * Converts a Point to node (local) space coordinates.
+     * !#zh
+     * 将一个点转换到节点 (局部) 空间坐标系。
+     * @method convertToNodeSpaceAR
+     * @param {Vec3|Vec2} worldPoint
+     * @param {Vec3|Vec2} [out]
+     * @return {Vec3|Vec2}
+     * @example
+     * var newVec2 = node.convertToNodeSpaceAR(cc.v2(100, 100));
+     * var newVec3 = node.convertToNodeSpaceAR(cc.v3(100, 100, 100));
+     */
+    convertToNodeSpaceAR (worldPoint, out) {
+        this._updateWorldMatrix();
+        mat4.invert(_mat4_temp, this._worldMatrix);
+
+        if (worldPoint instanceof cc.Vec2) {
+            out = out || new cc.Vec2();
+            return vec2.transformMat4(out, worldPoint, _mat4_temp);
+        }
+        else {
+            out = out || new cc.Vec3();
+            return vec3.transformMat4(out, worldPoint, _mat4_temp);
+        }
+    },
+
+    /**
+     * !#en
+     * Converts a Point in node coordinates to world space coordinates.
+     * !#zh
+     * 将节点坐标系下的一个点转换到世界空间坐标系。
+     * @method convertToWorldSpaceAR
+     * @param {Vec3|Vec2} nodePoint
+     * @param {Vec3|Vec2} [out]
+     * @return {Vec3|Vec2}
+     * @example
+     * var newVec2 = node.convertToWorldSpaceAR(cc.v2(100, 100));
+     * var newVec3 = node.convertToWorldSpaceAR(cc.v3(100, 100, 100));
+     */
+    convertToWorldSpaceAR (nodePoint, out) {
+        this._updateWorldMatrix();
+        if (nodePoint instanceof cc.Vec2) {
+            out = out || new cc.Vec2();
+            return vec2.transformMat4(out, nodePoint, this._worldMatrix);
+        }
+        else {
+            out = out || new cc.Vec3();
+            return vec3.transformMat4(out, nodePoint, this._worldMatrix);
+        }
+    },
+
+// OLD TRANSFORM ACCESS APIs
+ /**
      * !#en Converts a Point to node (local) space coordinates then add the anchor point position.
      * So the return position will be related to the left bottom corner of the node's bounding box.
      * This equals to the API behavior of cocos2d-x, you probably want to use convertToNodeSpaceAR instead
@@ -2953,6 +2969,7 @@ let NodeDefines = {
      * 也就是说返回的坐标是相对于节点包围盒左下角的坐标。<br/>
      * 这个 API 的设计是为了和 cocos2d-x 中行为一致，更多情况下你可能需要使用 convertToNodeSpaceAR。
      * @method convertToNodeSpace
+     * @deprecated since v2.1.3
      * @param {Vec2} worldPoint
      * @return {Vec2}
      * @example
@@ -2974,6 +2991,7 @@ let NodeDefines = {
      * !#zh 将一个相对于节点左下角的坐标位置转换到世界空间坐标系。
      * 这个 API 的设计是为了和 cocos2d-x 中行为一致，更多情况下你可能需要使用 convertToWorldSpaceAR
      * @method convertToWorldSpace
+     * @deprecated since v2.1.3
      * @param {Vec2} nodePoint
      * @return {Vec2}
      * @example
@@ -2988,42 +3006,6 @@ let NodeDefines = {
         return vec2.transformMat4(out, out, this._worldMatrix);
     },
 
-    /**
-     * !#en
-     * Converts a Point to node (local) space coordinates in which the anchor point is the origin position.
-     * !#zh
-     * 将一个点转换到节点 (局部) 空间坐标系，这个坐标系以锚点为原点。
-     * @method convertToNodeSpaceAR
-     * @param {Vec2} worldPoint
-     * @return {Vec2}
-     * @example
-     * var newVec2 = node.convertToNodeSpaceAR(cc.v2(100, 100));
-     */
-    convertToNodeSpaceAR (worldPoint) {
-        this._updateWorldMatrix();
-        mat4.invert(_mat4_temp, this._worldMatrix);
-        let out = new cc.Vec2();
-        return vec2.transformMat4(out, worldPoint, _mat4_temp);
-    },
-
-    /**
-     * !#en
-     * Converts a Point in node coordinates to world space coordinates.
-     * !#zh
-     * 将节点坐标系下的一个点转换到世界空间坐标系。
-     * @method convertToWorldSpaceAR
-     * @param {Vec2} nodePoint
-     * @return {Vec2}
-     * @example
-     * var newVec2 = node.convertToWorldSpaceAR(cc.v2(100, 100));
-     */
-    convertToWorldSpaceAR (nodePoint) {
-        this._updateWorldMatrix();
-        let out = new cc.Vec2();
-        return vec2.transformMat4(out, nodePoint, this._worldMatrix);
-    },
-
-// OLD TRANSFORM ACCESS APIs
     /**
      * !#en
      * Returns the matrix that transform the node's (local) space coordinates into the parent's space coordinates.<br/>
@@ -3404,7 +3386,7 @@ let NodeDefines = {
         this._localMatDirty = LocalDirtyFlag.ALL;
         this._worldMatDirty = true;
 
-        this._toEuler();
+        this._fromEuler();
 
         this._renderFlag |= RenderFlow.FLAG_TRANSFORM;
         if (this._renderComponent) {
@@ -3447,16 +3429,6 @@ if (CC_EDITOR) {
             editorOnly: true
         },
         _scaleY: {
-            default: undefined,
-            type: cc.Float,
-            editorOnly: true
-        },
-        _rotationX: {
-            default: undefined,
-            type: cc.Float,
-            editorOnly: true
-        },
-        _rotationY: {
             default: undefined,
             type: cc.Float,
             editorOnly: true
