@@ -63,7 +63,6 @@ let RigidBody3D = cc.Class({
     },
 
     properties: {
-        _isTrigger: false,
         _isKinematic: false,
         _mass: 1.0,
         _angularDamping: 0.0,
@@ -79,25 +78,10 @@ let RigidBody3D = cc.Class({
         _angularFactor: vec3.create(1, 1, 1),
 
         /**
-         * !#en Enabled trigger
-         * !#zh 是否为触发器
-         * @property {Boolean} isTrigger
-         * @default false
-         */
-        isTrigger: {
-            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.isTrigger',
-            get () {
-                return this._isTrigger;
-            },
-            set (value) {
-                this._isTrigger = value;
-                this._updateTrigger(value);
-            }
-        },
-
-        /**
          * !#en Angular damping
          * !#zh 角阻力
+         * @property {Number} angularDamping
+         * @default 0.0
          */
         angularDamping: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.angularDamping',
@@ -113,6 +97,8 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Mass
         * !#zh 质量
+        * @property {Number} mass
+        * @default 1.0
         */
         mass: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.mass',
@@ -129,6 +115,8 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Linear damping
         * !#zh 线阻力
+        * @property {Number} linearDamping
+        * @default 0.0
         */
         linearDamping: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.linearDamping',
@@ -144,6 +132,8 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Is kinematic
         * !#zh 是否动力学物体
+        * @property {Boolean} isKinematic
+        * @default false
         */
         isKinematic: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.isKinematic',
@@ -181,6 +171,8 @@ let RigidBody3D = cc.Class({
         /**
         * !#en gravity
         * !#zh 重力
+        * @property {Vec3} gravity
+        * @default cc.v3(0, -10, 0)
         */
         gravity: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.gravity',
@@ -198,6 +190,8 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Override gravity
         * !#zh 是否重载重力
+        * @property {Boolean} overrideGravity
+        * @default false
         */
         overrideGravity: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.overrideGravity',
@@ -223,6 +217,7 @@ let RigidBody3D = cc.Class({
         /**
         * !#en total force
         * !#zh 总力
+        * @property {Vec3} totalForce
         */
         totalForce: {
             get () {
@@ -233,6 +228,8 @@ let RigidBody3D = cc.Class({
         /**
         * !#en linear velocity
         * !#zh 线速度
+        * @property {Vec3} linearVelocity
+        * @default cc.v3(0, -10, 0)
         */
         linearVelocity: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.linearVelocity',
@@ -251,6 +248,8 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Is needed to detect collisions
         * !#zh 是否进行碰撞检测
+        * @property {Boolean} detectCollisions
+        * @default true
         */
         detectCollisions: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.detectCollisions',
@@ -271,6 +270,8 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Linear factor
         * !#zh 线性因子
+        * @property {Vec3} linearFactor
+        * @default cc.v3(1, 1, 1)
         */
         linearFactor: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.linearFactor',
@@ -288,6 +289,8 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Angular factor
         * !#zh 角因子
+        * @property {Vec3} angularFactor
+        * @default cc.v3(1, 1, 1)
         */
         angularFactor: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.angularFactor',
@@ -305,6 +308,8 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Angular velocity
         * !#zh 角速度
+        * @property {Vec3} angularVelocity
+        * @default cc.v3(0, 0, 0)
         */
         angularVelocity: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.angularVelocity',
@@ -323,6 +328,7 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Total torque
         * !#zh 刚体所有扭力
+        * @property {Vec3} totalTorque
         */
         totalTorque: {
             get () {
@@ -338,6 +344,7 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Is sleeping
         * !#zh 是否处于睡眠状态
+        * @property {Boolean} isSleeping
         */
         isSleeping: {
             get () {
@@ -348,6 +355,7 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Sleep linear velocity
         * !#zh 刚体睡眠的线速度阈值
+        * @property {Number} sleepLinearVelocity
         */
         sleepLinearVelocity: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.sleepLinearVelocity',
@@ -363,6 +371,7 @@ let RigidBody3D = cc.Class({
         /**
         * !#en Sleep angular velocity
         * !#zh 刚体睡眠的角速度阈值
+        * @property {Number} sleepAngularVelocity
         */
         sleepAngularVelocity: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.sleepAngularVelocity',
@@ -544,7 +553,6 @@ let RigidBody3D = cc.Class({
         let colliderObject = this._colliderObject = new ammo.btRigidBody(rigidBodyConstructionInfo);
         colliderObject.setUserIndex(this._id);
 
-        this.isTrigger = this._isTrigger;
         this.isKinematic = this._isKinematic;
         this.mass = this._mass;
         this.angularDamping = this._angularDamping,
@@ -577,18 +585,6 @@ let RigidBody3D = cc.Class({
         this._colliderObject.updateInertiaTensor();
 
         this._addToWorld();
-    },
-
-    _updateTrigger (value) {
-        let colliderObject = this._colliderObject;
-        let flags = colliderObject.getCollisionFlags();
-        if (value) {
-            if ((flags & CollisionFlag.NO_CONTACT_RESPONSE) === 0)
-                colliderObject.setCollisionFlags(flags | CollisionFlag.NO_CONTACT_RESPONSE);
-        } else {
-            if ((flags & CollisionFlag.NO_CONTACT_RESPONSE) !== 0)
-                colliderObject.setCollisionFlags(flags & ~ CollisionFlag.NO_CONTACT_RESPONSE);
-        }
     },
 });
 

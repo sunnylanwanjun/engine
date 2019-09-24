@@ -1,5 +1,5 @@
 /****************************************************************************
- Copyright (c) 2019 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 20179 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos2d-x.org
 
@@ -21,13 +21,8 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
+let Physics3DUtils = cc.Class({
 
-require("./physics3d-manager");
-require("./physics3d-utils");
-require("./compound-shape");
-require("./physics3d-base");
-require("./collider3d");
-require("./rigidbody3d");
-require("./shape/shape3d");
-require("./shape/box-shape");
-require("./shape/sphere-shape");
+});
+
+module.exports = cc.Physics3DUtils = Physics3DUtils;

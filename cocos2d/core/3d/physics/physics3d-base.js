@@ -71,12 +71,19 @@ let Physics3DBase = cc.Class({
     },
 
     properties: {
+        _isTrigger: false,
         _restitution: 0.0,
         _friction: 0.5,
         _rollingFriction: 0.0,
         _ccdMotionThreshold: 0.0,
         _ccdSweptSphereRadius: 0.0,
 
+        /**
+         * !#en restitution
+         * !#zh 弹力
+         * @property {Number} restitution
+         * @default 0.0
+         */
         restitution: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.restitution',
             get () {
@@ -88,6 +95,12 @@ let Physics3DBase = cc.Class({
             }
         },
 
+        /**
+         * !#en friction
+         * !#zh 摩擦力
+         * @property {Number} friction
+         * @default 0.5
+         */
         friction: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.friction',
             get () {
@@ -99,6 +112,12 @@ let Physics3DBase = cc.Class({
             }
         },
 
+        /**
+         * !#en rolling friction
+         * !#zh 滚动摩擦力
+         * @property {Number} rollingFriction
+         * @default 0.0
+         */
         rollingFriction: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rollingFriction',
             get () {
@@ -110,6 +129,12 @@ let Physics3DBase = cc.Class({
             },
         },
 
+        /**
+         * !#en CCD motion threshold
+         * !#zh 连续碰撞检测(CCD)的速度阈值
+         * @property {Number} ccdMotionThreshold
+         * @default 0.0
+         */
         ccdMotionThreshold: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.ccdMotionThreshold',
             get () {
@@ -121,6 +146,12 @@ let Physics3DBase = cc.Class({
             },
         },
 
+        /**
+         * !#en CCD sphere radius
+         * !#zh 连续碰撞检测(CCD)范围的球半径
+         * @property {Number} ccdSweptSphereRadius
+         * @default 0.0
+         */
         ccdSweptSphereRadius: {
             tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.ccdSweptSphereRadius',
             get () {
@@ -129,6 +160,23 @@ let Physics3DBase = cc.Class({
             set (value) {
                 this._ccdSweptSphereRadius = value;
                 this._colliderObject.setCcdSweptSphereRadius(value);
+            }
+        },
+
+        /**
+         * !#en Enabled trigger
+         * !#zh 是否为触发器
+         * @property {Boolean} isTrigger
+         * @default false
+         */
+        isTrigger: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.isTrigger',
+            get () {
+                return this._isTrigger;
+            },
+            set (value) {
+                this._isTrigger = value;
+                this._updateTrigger(value);
             }
         },
     },
@@ -217,6 +265,7 @@ let Physics3DBase = cc.Class({
         this.rollingFriction = this._rollingFriction;
         this.ccdMotionThreshold = this._ccdMotionThreshold;
         this.ccdSweptSphereRadius = this._ccdSweptSphereRadius;
+        this.isTrigger = this._isTrigger;
     },
 
     _updateGroupOrMask () {
@@ -310,6 +359,18 @@ let Physics3DBase = cc.Class({
 
     _updateScale (scale) {
         this._colliderShape._updateScale(scale);
+    },
+
+    _updateTrigger (value) {
+        let colliderObject = this._colliderObject;
+        let flags = colliderObject.getCollisionFlags();
+        if (value) {
+            if ((flags & CollisionFlag.NO_CONTACT_RESPONSE) === 0)
+                colliderObject.setCollisionFlags(flags | CollisionFlag.NO_CONTACT_RESPONSE);
+        } else {
+            if ((flags & CollisionFlag.NO_CONTACT_RESPONSE) !== 0)
+                colliderObject.setCollisionFlags(flags & ~ CollisionFlag.NO_CONTACT_RESPONSE);
+        }
     }
 });
 

@@ -28,10 +28,37 @@ let Physics3DManager = cc.Class({
 
     properties: {
         maxSubStep: 1.0,
-        fixedTimeStep: 1.0 / 60.0
+        fixedTimeStep: 1.0 / 60.0,
+        _enabledDebugDraw: true,
+
+        /**
+         * !#en
+         * enabled debug draw
+         * !#zh
+         * 是否绘制碰撞组件的形状，默认为不绘制
+         * @property {Boolean} enabledDebugDraw
+         * @default false
+         */
+        enabledDebugDraw: {
+            get () {
+                return this._enabledDebugDraw;
+            },
+            set (value) {
+                if (value && !this._enabledDebugDraw) {
+                    this._checkDebugDrawValid();
+                    this._debugDrawer.node.active = true;
+                }
+                else if (!value && this._enabledDebugDraw) {
+                    this._debugDrawer.clear(true);
+                    this._debugDrawer.node.active = false;
+                }
+                this._enabledDebugDraw = value;
+            }
+        },
     },
 
     ctor () {
+        this._debugDrawer = null;
         this._vector3Zero = null;
         this._quaternion = null;
 
@@ -57,7 +84,6 @@ let Physics3DManager = cc.Class({
     },
 
     init (isCollisionOnly) {
-
         let vec30 = this._vector3Zero = new ammo.btVector3(0, 0, 0);
 		this._quaternion = new ammo.btQuaternion(0, 0, 0, 1);
 
@@ -81,7 +107,9 @@ let Physics3DManager = cc.Class({
 		this._allHitsRayResultCallback = new ammo.AllHitsRayResultCallback(vec30, vec30);
 		this._closestConvexResultCallback = new ammo.ClosestConvexResultCallback(vec30, vec30);
 		this._allConvexResultCallback = new ammo.AllConvexResultCallback(vec30, vec30);
-		ammo._btGImpactCollisionAlgorithm_RegisterAlgorithm(this._dispatcher.a);
+        ammo._btGImpactCollisionAlgorithm_RegisterAlgorithm(this._dispatcher.a);
+        
+        this.enabledDebugDraw = this._enabledDebugDraw;
     },
 
     destroy () {
@@ -147,11 +175,67 @@ let Physics3DManager = cc.Class({
     update (dt) {
         this._updatePhysicsTransfrom();
         this._simulator(dt);
+
+        if (this._collisionWorld && this._enabledDebugDraw) {
+            this._collisionWorld.debugDrawWorld();
+        }
+
         this._updateCollision();
         this._executeCallback();
     },
 
     /// private interface
+
+    _checkDebugDrawValid () {
+        if (!this._debugDrawer || !this._debugDrawer.isValid) {
+            let node = new cc.Node('COLLISION_MANAGER_DEBUG_DRAW');
+            node.zIndex = cc.macro.MAX_ZINDEX;
+            cc.game.addPersistRootNode(node);
+            this._debugDrawer = node.addComponent(cc.Graphics);
+
+            let oldAmmoDebugDrawer = this._ammoDebugDrawer;
+            let ammoDebugDrawer = this._ammoDebugDrawer = new ammo.DebugDrawer();
+            ammoDebugDrawer.DebugDrawMode = 0;
+            ammoDebugDrawer.drawLine = function (from, to, color) {
+                cc.log("drawLine", 
+                    "from", from.x(), from.y(), from.z(), 
+                    "to", to.x(), to.y(), to.z(), 
+                    "color", color.x(), color.y(), color.z());
+                // to do ...
+            };
+            ammoDebugDrawer.drawContactPoint = function (pointOnB, normalOnB, distance, lifeTime, color) {
+                cc.log("drawContactPoint", 
+                "pointOnB", pointOnB.x(), pointOnB.y(), pointOnB.z(), 
+                "normalOnB", normalOnB.x(), normalOnB.y(), normalOnB.z(),
+                "distance", distance,
+                "lifeTime", lifeTime,
+                "color", color.x(), color.y(), color.z());
+                // to do ...
+            };
+            ammoDebugDrawer.reportErrorWarning = function(warningString) {
+                console.warn(warningString);
+            };
+            ammoDebugDrawer.draw3dText = function(location, textString) {
+                cc.log("drawContactPoint", 
+                "location", location.x(), location.y(), location.z(),
+                "textString", textString);
+                // to do ...
+            };
+            ammoDebugDrawer.setDebugMode = function(debugMode) {
+                this.DebugDrawMode = debugMode;
+            };
+            ammoDebugDrawer.getDebugMode = function() {
+                return this.DebugDrawMode;
+            };
+            if (oldAmmoDebugDrawer) {
+                ammo.destroy(oldAmmoDebugDrawer);
+                oldAmmoDebugDrawer = null;
+            }
+            if (this._collisionWorld) {
+                this._collisionWorld.setDebugDrawer(ammoDebugDrawer);
+            }
+        }
+    },
 
     _registerPhysics3D (object) {
         this._physics3DObjectMap[object._id] = object;
