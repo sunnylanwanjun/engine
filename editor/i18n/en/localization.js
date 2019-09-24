@@ -359,11 +359,29 @@ module.exports = {
             'segements': 'The segements for ellipse mask'
         },
         'physics3d': {
+            'restitution': '',
+            'friction': '',
+            'rollingFriction': '',
+            'ccdMotionThreshold': '',
+            'ccdSweptSphereRadius': '',
             'rigidbody': {
-                
+                'isTrigger': '',
+                'angularDamping': '',
+                'mass': '',
+                'linearDamping': '',
+                'isKinematic': '',
+                'gravity': '',
+                'overrideGravity': '',
+                'linearVelocity': '',
+                'detectCollisions': '',
+                'linearFactor': '',
+                'angularFactor': '',
+                'angularVelocity': '',
+                'sleepLinearVelocity': '',
+                'sleepAngularVelocity': '',
             },
             'collider': {
-                'isTrigger': '',
+                
             }
         },
         'physics': {

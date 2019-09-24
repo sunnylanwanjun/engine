@@ -22,11 +22,19 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-import { vec3 } from '../../vmath';
-const js = require('../platform/js');
-let Physics3D = require("./physics3d");
+import { vec3, quat } from '../../vmath';
+
+let Physics3DBase = require("./physics3d-base");
+let CollisionFlag = Physics3DBase.CollisionFlag;
+let ActivationState = Physics3DBase.ActivationState;
+let btRigidBodyFlags = Physics3DBase.btRigidBodyFlags;
+
 let ammo = require("./lib/ammo");
 
+let _tempCCVec3 = cc.v3(0, 0, 0);
+let _tempCCQuat = new cc.quat();
+let _tempCCQuat_2 = new cc.quat();
+let _tempCCQuat_3 = new cc.quat();
 let _localInertia = new ammo.btVector3(0, 0, 0);
 let _tempBTVec3 = new ammo.btVector3();
 let _tempBTVec3_2 = new ammo.btVector3();
@@ -45,85 +53,337 @@ let trsToAmmoQuat = function (ammoQuat, trs) {
     ammoQuat.setW(trs[6]);
 }
 
-let RigidBody3D = function (node) {
-    this._motionState = null;
+let RigidBody3D = cc.Class({
+    name: 'cc.RigidBody3D',
+    extends: Physics3DBase,
 
-    this._enableProcessCollisions = true;
-    this._isKinematic = false;
-    this._mass = 1.0;
-    this._angularDamping = 0.0;
-    this._linearDamping = 0.0;
-
-    this._overrideGravity = false;
-    this._detectCollisions = true;
-
-    this._gravity = vec3.create(0, -10, 0);
-    this._totalTorque = vec3.create(0, 0, 0);
-    this._linearVelocity = vec3.create(0, 0, 0);
-    this._angularVelocity = vec3.create(0, 0, 0);
-    this._linearFactor = vec3.create(1, 1, 1);
-    this._angularFactor = vec3.create(1, 1, 1);
-
-    Physics3D.call(this, node);
-};
-
-let proto = RigidBody3D.prototype;
-js.extend(proto, Physics3D);
-
-js.mixin(proto, {
-
-    _removeFromWorld () {
-        Physics3D.prototype._removeFromWorld.call(this);
-        this._physics3DManger._removeRigidBody(this._colliderObject);
+    editor: CC_EDITOR && {
+        executeInEditMode: true,
+        disallowMultiple: true
     },
 
-    _addToWorld () {
-        Physics3D.prototype._addToWorld.call(this);
-        this._physics3DManger._addRigidBody(this._colliderObject, this._collisionFilterGroup, this._collisionFilterMask);
+    properties: {
+        _isTrigger: false,
+        _isKinematic: false,
+        _mass: 1.0,
+        _angularDamping: 0.0,
+        _linearDamping: 0.0,
+
+        _overrideGravity: false,
+        _detectCollisions: true,
+
+        _gravity: vec3.create(0, -10, 0),
+        _linearVelocity: vec3.create(0, 0, 0),
+        _angularVelocity: vec3.create(0, 0, 0),
+        _linearFactor: vec3.create(1, 1, 1),
+        _angularFactor: vec3.create(1, 1, 1),
+
+        /**
+         * !#en Enabled trigger
+         * !#zh 是否为触发器
+         * @property {Boolean} isTrigger
+         * @default false
+         */
+        isTrigger: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.isTrigger',
+            get () {
+                return this._isTrigger;
+            },
+            set (value) {
+                this._isTrigger = value;
+                this._updateTrigger(value);
+            }
+        },
+
+        /**
+         * !#en Angular damping
+         * !#zh 角阻力
+         */
+        angularDamping: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.angularDamping',
+            get () {
+                return this._angularDamping;
+            },
+            set (value) {
+                this._angularDamping = value;
+                this._colliderObject.setDamping(this._linearDamping, value);
+            }
+        },
+
+        /**
+        * !#en Mass
+        * !#zh 质量
+        */
+        mass: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.mass',
+            get () {
+                return this._mass;
+            },
+            set (value) {
+                value = Math.max(value, 0);
+                this._mass = value;
+                (this._isKinematic) || (this._updateMass(value));
+            }
+        },
+
+        /**
+        * !#en Linear damping
+        * !#zh 线阻力
+        */
+        linearDamping: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.linearDamping',
+            get () {
+                return this._linearDamping;
+            },
+            set (value) {
+                this._linearDamping=value;
+                this._colliderObject.setDamping(value, this._angularDamping);
+            }
+        },
+
+        /**
+        * !#en Is kinematic
+        * !#zh 是否动力学物体
+        */
+        isKinematic: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.isKinematic',
+            get () {
+                return this._isKinematic;
+            },
+            set (value) {
+                this._isKinematic = value;
+                this._enabled && this._removeFromWorld();
+                let colliderObject = this._colliderObject;
+                let flags = colliderObject.getCollisionFlags();
+                if (value) {
+                    flags = flags | CollisionFlag.KINEMATIC_OBJECT;
+                    colliderObject.setCollisionFlags(flags);
+                    colliderObject.forceActivationState(ActivationState.DISABLE_DEACTIVATION);
+                    this._needHandleCollisions = false;
+                    this._updateMass(0);
+                } else {
+                    if (flags & CollisionFlag.KINEMATIC_OBJECT)
+                        flags = flags & ~ CollisionFlag.KINEMATIC_OBJECT;
+                    colliderObject.setCollisionFlags(flags);
+                    colliderObject.setActivationState(ActivationState.ACTIVE_TAG);
+                    this._needHandleCollisions = true;
+                    this._updateMass(this._mass);
+                };
+                _tempBTVec3.setValue(0, 0, 0);
+                colliderObject.setInterpolationLinearVelocity(_tempBTVec3);
+                colliderObject.setLinearVelocity(_tempBTVec3);
+                colliderObject.setInterpolationAngularVelocity(_tempBTVec3);
+                colliderObject.setAngularVelocity(_tempBTVec3);
+                this._enabled && this._addToWorld();
+            }
+        },
+
+        /**
+        * !#en gravity
+        * !#zh 重力
+        */
+        gravity: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.gravity',
+            type: cc.Vec3,
+            get () {
+                return this._gravity;
+            },
+            set (value) {
+                this._gravity.set(value);
+                _tempBTVec3.setValue(value.x, value.y, value.z);
+                this._colliderObject.setGravity(_tempBTVec3);
+            }
+        },
+
+        /**
+        * !#en Override gravity
+        * !#zh 是否重载重力
+        */
+        overrideGravity: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.overrideGravity',
+            get () {
+                return this._overrideGravity;
+            },
+            set (value) {
+                this._overrideGravity = value;
+                let colliderObject = this._colliderObject;
+                let flag = colliderObject.getFlags();
+                if (value) {
+                    if ((flag & btRigidBodyFlags.DISABLE_WORLD_GRAVITY) === 0) {
+                        colliderObject.setFlags(flag | btRigidBodyFlags.DISABLE_WORLD_GRAVITY);
+                    }
+                } else {
+                    if ((flag & btRigidBodyFlags.DISABLE_WORLD_GRAVITY) > 0) {
+                        colliderObject.setFlags(flag & ~ btRigidBodyFlags.DISABLE_WORLD_GRAVITY);
+                    }
+                }
+            }
+        },
+
+        /**
+        * !#en total force
+        * !#zh 总力
+        */
+        totalForce: {
+            get () {
+                return this._colliderObject.getTotalForce();
+            }
+        },
+
+        /**
+        * !#en linear velocity
+        * !#zh 线速度
+        */
+        linearVelocity: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.linearVelocity',
+            type: cc.Vec3,
+            get () {
+                return this._linearVelocity;
+            },
+            set (value) {
+                this._linearVelocity.set(value);
+                _tempBTVec3.setValue(value.x, value.y, value.z);
+                this.isSleeping && this.wakeUp();
+                this._colliderObject.setLinearVelocity(_tempBTVec3);
+            }
+        },
+
+        /**
+        * !#en Is needed to detect collisions
+        * !#zh 是否进行碰撞检测
+        */
+        detectCollisions: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.detectCollisions',
+            get () {
+                return this._detectCollisions;
+            },
+            set (value) {
+                if (this._detectCollisions !== value) {
+                    this._detectCollisions = value;
+                    if (this._enabled) {
+                        this._removeFromWorld();
+                        this._addToWorld();
+                    }
+                }
+            }
+        },
+
+        /**
+        * !#en Linear factor
+        * !#zh 线性因子
+        */
+        linearFactor: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.linearFactor',
+            type: cc.Vec3,
+            get () {
+                return this._linearFactor;
+            },
+            set (value) {
+                this._linearFactor.set(value);
+                _tempBTVec3.setValue(value.x, value.y, value.z);
+                this._colliderObject.setLinearFactor(_tempBTVec3);
+            }
+        },
+
+        /**
+        * !#en Angular factor
+        * !#zh 角因子
+        */
+        angularFactor: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.angularFactor',
+            type: cc.Vec3,
+            get () {
+                return this._angularFactor;
+            },
+            set (value) {
+                this._angularFactor.set(value);
+                _tempBTVec3.setValue(value.x, value.y, value.z);
+                this._colliderObject.setAngularFactor(_tempBTVec3);
+            }
+        },
+
+        /**
+        * !#en Angular velocity
+        * !#zh 角速度
+        */
+        angularVelocity: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.angularVelocity',
+            type: cc.Vec3,
+            get () {
+                return this._angularVelocity;
+            },
+            set (value) {
+                this._angularVelocity.set(value);
+                _tempBTVec3.setValue(value.x, value.y, value.z);
+                this.isSleeping && this.wakeUp();
+                this._colliderObject.setAngularVelocity(_tempBTVec3);
+            }
+        },
+
+        /**
+        * !#en Total torque
+        * !#zh 刚体所有扭力
+        */
+        totalTorque: {
+            get () {
+                let value = this._colliderObject.getTotalTorque();
+                var out = this._totalTorque;
+                out.x = value.x;
+                out.y = value.y;
+                out.z = value.z;
+                return out;
+            }
+        },
+
+        /**
+        * !#en Is sleeping
+        * !#zh 是否处于睡眠状态
+        */
+        isSleeping: {
+            get () {
+                return this._colliderObject.getActivationState() === ActivationState.ISLAND_SLEEPING;
+            }
+        },
+
+        /**
+        * !#en Sleep linear velocity
+        * !#zh 刚体睡眠的线速度阈值
+        */
+        sleepLinearVelocity: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.sleepLinearVelocity',
+            get () {
+                return this._colliderObject.getLinearSleepingThreshold();
+            },
+            set (value) {
+                let colliderObject = this._colliderObject;
+                colliderObject.setSleepingThresholds(value, colliderObject.getAngularSleepingThreshold());
+            }
+        },
+
+        /**
+        * !#en Sleep angular velocity
+        * !#zh 刚体睡眠的角速度阈值
+        */
+        sleepAngularVelocity: {
+            tooltip: CC_DEV && 'i18n:COMPONENT.physics3d.rigidbody.sleepAngularVelocity',
+            get () {
+                return this._colliderObject.getAngularSleepingThreshold();
+            },
+            set (value) {
+                let colliderObject = this._colliderObject;
+                colliderObject.setSleepingThresholds(colliderObject.getLinearSleepingThreshold(), value);
+            }
+        },
     },
 
-    _buildCollider () {
-        let node = this._node;
-        let trs = node._trs;
-
-        let motionState = this._motionState = new ammo.btDefaultMotionState();
-        motionState.getWorldTransform = function (btTransformPointer) {
-            let btTransform = ammo.wrapPointer(btTransformPointer, ammo.btTransform);
-            btTransform.setIdentity();
-            trsToAmmoVec3(_tempBTVec3, trs);
-            btTransform.setOrigin(_tempBTVec3);
-            trsToAmmoQuat(_tempBTQuat, trs);
-            btTransform.setRotation(_tempBTQuat);
-        };
-
-        motionState.setWorldTransform = function (btTransformPointer) {
-            let btTransform = ammo.wrapPointer(btTransformPointer, ammo.btTransform);
-            let physicsOrigin = btTransform.getOrigin();
-            let x = physicsOrigin.x();
-            let y = physicsOrigin.y();
-            let z = physicsOrigin.z();
-            node.setPosition(x, y, z);
-            let physicsRotation = btTransform.getRotation();
-            let rotX = physicsRotation.x();
-            let rotY = physicsRotation.y();
-            let rotZ = physicsRotation.z();
-            let rotW = physicsRotation.w();
-            node.setRotation(rotX, rotY, rotZ, rotW);
-        };
-
-        const rigidBodyConstructionInfo = new ammo.btRigidBodyConstructionInfo(this._mass, motionState, this._compoundShape, _localInertia);
-        let colliderObject = this._colliderObject = new ammo.btRigidBody(rigidBodyConstructionInfo);
-        colliderObject.setUserIndex(this._id);
-
-        ammo.destroy(rigidBodyConstructionInfo);
+    ctor () {
+        this._needHandleCollisions = true;
+        this._motionState = null;
+        this._totalTorque = vec3.create(0, 0, 0);
     },
 
-    /**
-     * !#en destroy all WebAssembly object
-     * !#zh 释放所有 WebAssembly 对象
-     */
-    destroy () {
-        Physics3D.prototype.destroy.call(this);
+    onDestroy () {
+        this._super();
 
         if (this._motionState) {
             ammo.destroy(this._motionState);
@@ -212,8 +472,99 @@ js.mixin(proto, {
 		this._colliderObject.activate(false);
 	},
 
-    isRigidBody () {
-        return true;
+    /// private interface
+
+    _removeFromWorld () {
+        this._super();
+        this._physics3DManger._removeRigidBody(this._colliderObject);
+    },
+
+    _addToWorld () {
+        this._super();
+        this._physics3DManger._addRigidBody(this._colliderObject, this._collisionFilterGroup, this._collisionFilterMask);
+    },
+
+    _buildCollider () {
+        let node = this._node;
+        let trs = node._trs;
+
+        let motionState = this._motionState = new ammo.btDefaultMotionState();
+        motionState.getWorldTransform = function (btTransformPointer) {
+            let btTransform = ammo.wrapPointer(btTransformPointer, ammo.btTransform);
+            btTransform.setIdentity();
+            trsToAmmoVec3(_tempBTVec3, trs);
+            btTransform.setOrigin(_tempBTVec3);
+            trsToAmmoQuat(_tempBTQuat, trs);
+            btTransform.setRotation(_tempBTQuat);
+        };
+
+        motionState.setWorldTransform = function (btTransformPointer) {
+            let colliderShape = this._colliderShape;
+            let offset = colliderShape.offset;
+            let rotation = colliderShape.rotation;
+
+            this.node.getRotation(_tempCCQuat);
+            this.node.getPosition(_tempCCVec3);
+
+            let btTransform = ammo.wrapPointer(btTransformPointer, ammo.btTransform);
+            let physicsOrigin = btTransform.getOrigin();
+            let x = physicsOrigin.x();
+            let y = physicsOrigin.y();
+            let z = physicsOrigin.z();
+
+            let physicsRotation = btTransform.getRotation();
+            let rotX = physicsRotation.x();
+            let rotY = physicsRotation.y();
+            let rotZ = physicsRotation.z();
+            let rotW = physicsRotation.w();
+
+            if (offset.x !== 0 || offset.y !== 0 || offset.z !== 0) {
+                vec3.transformQuat(_tempCCVec3, offset, rotX, rotY,rotZ, rotW);
+                node.setPosition(x - _tempCCVec3.x, y - _tempCCVec3.y, z - _tempCCVec3.z);
+            } else {
+                node.setPosition(x, y, z);
+            }
+            
+            let rotation = colliderShape.rotation;
+			if (rotation.x !== 0 || rotation.y !== 0 || rotation.z !== 0) {
+                _tempCCQuat.fromEuler(rotation);
+                quat.invert(_tempCCQuat_2, _tempCCQuat);
+                _tempCCQuat.x = rotX;
+                _tempCCQuat.y = rotY;
+                _tempCCQuat.z = rotZ;
+                _tempCCQuat.w = rotW;
+                quat.multiply(_tempCCQuat_3, _tempCCQuat, _tempCCQuat_2);
+                node.setRotation(_tempCCQuat_3.x, _tempCCQuat_3.y, _tempCCQuat_3.z, _tempCCQuat_3.w);
+            } else {
+                node.setRotation(rotX, rotY, rotZ, rotW);
+            }
+        }.bind(this);
+
+        const rigidBodyConstructionInfo = new ammo.btRigidBodyConstructionInfo(this._mass, motionState, this._compoundShape, _localInertia);
+        let colliderObject = this._colliderObject = new ammo.btRigidBody(rigidBodyConstructionInfo);
+        colliderObject.setUserIndex(this._id);
+
+        this.isTrigger = this._isTrigger;
+        this.isKinematic = this._isKinematic;
+        this.mass = this._mass;
+        this.angularDamping = this._angularDamping,
+        this.linearDamping = this._linearDamping;
+
+        this.overrideGravity = this._overrideGravity;
+        this.detectCollisions = this._detectCollisions;
+
+        this.gravity = this._gravity;
+        this.linearVelocity = this._linearVelocity;
+        this.angularVelocity = this._angularVelocity;
+        this.linearFactor = this._linearFactor;
+        this.angularFactor = this._angularFactor;
+
+        ammo.destroy(rigidBodyConstructionInfo);
+    },
+
+    _updateScale (scale) {
+        this._super(scale);
+        this._updateMass(this._isKinematic ? 0 : this._mass);
     },
 
     _updateMass (value) {
@@ -227,272 +578,18 @@ js.mixin(proto, {
 
         this._addToWorld();
     },
-});
 
-/**
- * !#en Angular damping
- * !#zh 角阻力
- */
-js.getset(proto, 'angularDamping', 
-    function () {
-        return this._angularDamping;
-    },
-    function (value) {
-        this._angularDamping = value;
-        if (this._colliderObject) {
-            this._colliderObject.setDamping(this._linearDamping, value);
-        }
-    }
-);
-
-/**
- * !#en Mass
- * !#zh 质量
- */
-js.getset(proto, 'mass', 
-    function () {
-        return this._mass;
-    },
-    function (value) {
-        value = Math.max(value, 0);
-        this._mass = value;
-        (this._isKinematic) || (this._updateMass(value));
-    }
-);
-
-/**
- * !#en Linear damping
- * !#zh 线阻力
- */
-js.getset(proto, 'linearDamping',
-    function () {
-        return this._linearDamping;
-    },
-    function (value) {
-        this._linearDamping=value;
-        if (this._colliderObject) {
-            this._colliderObject.setDamping(value, this._angularDamping);
-        }
-    }
-);
-
-/**
- * !#en Is kinematic
- * !#zh 是否动力学物体
- */
-js.getset(proto, 'isKinematic', 
-    function () {
-        return this._isKinematic;
-    },
-    function (value) {
-        this._isKinematic = value;
-        this._enableCount > 0 && this._removeFromWorld();
+    _updateTrigger (value) {
         let colliderObject = this._colliderObject;
         let flags = colliderObject.getCollisionFlags();
         if (value) {
-            flags = flags | _CF_KINEMATIC_OBJECT;
-            colliderObject.setCollisionFlags(flags);
-            colliderObject.forceActivationState(_DISABLE_DEACTIVATION);
-            this._enableProcessCollisions = false;
-            this._updateMass(0);
+            if ((flags & CollisionFlag.NO_CONTACT_RESPONSE) === 0)
+                colliderObject.setCollisionFlags(flags | CollisionFlag.NO_CONTACT_RESPONSE);
         } else {
-            if (flags & _CF_KINEMATIC_OBJECT)
-                flags = flags & ~_CF_KINEMATIC_OBJECT;
-            colliderObject.setCollisionFlags(flags);
-            colliderObject.setActivationState(_ACTIVE_TAG);
-            this._enableProcessCollisions = true;
-            this._updateMass(this._mass);
-        };
-        _tempBTVec3.setValue(0, 0, 0);
-        colliderObject.setInterpolationLinearVelocity(_tempBTVec3);
-        colliderObject.setLinearVelocity(_tempBTVec3);
-        colliderObject.setInterpolationAngularVelocity(_tempBTVec3);
-        colliderObject.setAngularVelocity(_tempBTVec3);
-        this._enableCount > 0 && this._addToWorld();
-    }
-);
-
-/**
- * !#en gravity
- * !#zh 重力
- */
-js.getset(proto, 'gravity', 
-    function () {
-        return this._gravity;
-    },
-    function (value) {
-        this._gravity = value;
-        _tempBTVec3.setValue(value.x, value.y, value.z);
-        this._colliderObject.setGravity(_tempBTVec3);
-    }
-);
-
-/**
- * !#en Override gravity
- * !#zh 是否重载重力
- */
-js.getset(proto, 'overrideGravity', 
-    function () {
-        return this._overrideGravity;
-    },
-    function (value) {
-        this._overrideGravity = value;
-        let colliderObject = this._colliderObject;
-        let flag = colliderObject.getFlags();
-        if (value) {
-            if ((flag & _BT_DISABLE_WORLD_GRAVITY) === 0) {
-                colliderObject.setFlags(flag | _BT_DISABLE_WORLD_GRAVITY);
-            }
-        } else {
-            if ((flag & _BT_DISABLE_WORLD_GRAVITY) > 0) {
-                colliderObject.setFlags(flag & ~_BT_DISABLE_WORLD_GRAVITY);
-            }
+            if ((flags & CollisionFlag.NO_CONTACT_RESPONSE) !== 0)
+                colliderObject.setCollisionFlags(flags & ~ CollisionFlag.NO_CONTACT_RESPONSE);
         }
-    }
-);
-
-/**
- * !#en total force
- * !#zh 总力
- */
-js.get(proto, 'totalForce',
-    function () {
-        return this._colliderObject.getTotalForce();
-    }
-);
-
-/**
- * !#en linear velocity
- * !#zh 线速度
- */
-js.getset(proto, 'linearVelocity',
-    function(){
-        return this._linearDamping;
     },
-    function(value){
-        this._linearVelocity.set(value);
-        _tempBTVec3.setValue(value.x, value.y, value.z);
-        this.isSleeping && this.wakeUp();
-        this._colliderObject.setLinearVelocity(_tempBTVec3);
-    }
-);
-
-/**
- * !#en Is needed to detect collisions
- * !#zh 是否进行碰撞检测
- */
-js.getset(proto, 'detectCollisions',
-    function(){
-        return this._detectCollisions;
-    },
-    function (value) {
-        if (this._detectCollisions !== value) {
-            this._detectCollisions = value;
-            if (this._enableCount > 0) {
-                this._removeFromWorld();
-                this._addToWorld();
-            }
-        }
-    }
-);
-
-/**
- * !#en Linear factor
- * !#zh 线性因子
- */
-js.getset(proto, 'linearFactor',
-    function(){
-        return this._linearFactor;
-    },
-    function(value){
-        this._linearFactor.set(value);
-        _tempBTVec3.setValue(value.x, value.y, value.z);
-        this._colliderObject.setLinearFactor(_tempBTVec3);
-    }
-);
-
-/**
- * !#en Angular factor
- * !#zh 角因子
- */
-js.getset(proto, 'angularFactor',
-    function () {
-        return this._angularFactor;
-    },
-    function (value) {
-        this._angularFactor.set(value);
-        _tempBTVec3.setValue(value.x, value.y, value.z);
-        this._colliderObject.setAngularFactor(_tempBTVec3);
-    }
-);
-
-/**
- * !#en Angular velocity
- * !#zh 角速度
- */
-js.getset(proto, 'angularVelocity',
-    function () {
-        return this._angularVelocity;
-    },
-    function (value) {
-        this._angularVelocity.set(value);
-        _tempBTVec3.setValue(value.x, value.y, value.z);
-        this.isSleeping && this.wakeUp();
-        this._colliderObject.setAngularVelocity(_tempBTVec3);
-    }
-);
-
-/**
- * !#en Total torque
- * !#zh 刚体所有扭力
- */
-js.get(proto, 'totalTorque',
-    function () {
-        let value = this._colliderObject.getTotalTorque();
-        var out = this._totalTorque;
-        out.x = value.x;
-        out.y = value.y;
-        out.z = value.z;
-        return out;
-    }
-);
-
-/**
- * !#en Is sleeping
- * !#zh 是否处于睡眠状态
- */
-js.get(proto, 'isSleeping',
-    function () {
-        return this._colliderObject.getActivationState() === _ISLAND_SLEEPING;
-    }
-);
-
-/**
- * !#en Sleep linear velocity
- * !#zh 刚体睡眠的线速度阈值
- */
-js.getset(proto, 'sleepLinearVelocity',
-    function () {
-        return this._colliderObject.getLinearSleepingThreshold();
-    },
-    function (value) {
-        let colliderObject = this._colliderObject;
-        colliderObject.setSleepingThresholds(value, colliderObject.getAngularSleepingThreshold());
-    }
-);
-
-/**
- * !#en Sleep angular velocity
- * !#zh 刚体睡眠的角速度阈值
- */
-js.getset(proto, 'sleepAngularVelocity',
-    function () {
-        return this._colliderObject.getAngularSleepingThreshold();
-    },
-    function (value) {
-        let colliderObject = this._colliderObject;
-        colliderObject.setSleepingThresholds(colliderObject.getLinearSleepingThreshold(), value);
-    }
-);
+});
 
 module.exports = RigidBody3D;

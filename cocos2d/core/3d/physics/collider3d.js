@@ -22,50 +22,55 @@
  THE SOFTWARE.
  ****************************************************************************/
 let ammo = require("./lib/ammo");
-const js = require('../platform/js');
-let Physics3D = require("./physics3d");
+let Physics3DBase = require("./physics3d-base");
+let CollisionFlag = Physics3DBase.CollisionFlag;
+let ActivationState = Physics3DBase.ActivationState;
 
-let Collider3D = function (node) {
-    Physics3D.call(this, node);
-};
+let Collider3D = cc.Class ({
+    name: 'cc.Collider3D',
+    extends: Physics3DBase,
 
-let proto = Collider3D.prototype;
-js.extend(proto, Physics3D);
+    editor: CC_EDITOR && {
+        executeInEditMode: true,
+        disallowMultiple: true
+    },
 
-js.mixin(proto, {
+    ctor () {
+
+    },
+
+    onDestroy () {
+        this._super();
+        if (this._colliderObject) {
+            ammo.destroy(this._colliderObject);
+            this._colliderObject = null;
+        }
+    },
+
+    /// private interface
+    __preload () {
+        this._super();
+    },
 
     _removeFromWorld () {
-        Physics3D.prototype._removeFromWorld.call(this);
+        this._super();
         this._physics3DManger._addCollider(this._colliderObject);
     },
 
     _addToWorld () {
-        Physics3D.prototype._addToWorld.call(this);
+        this._super();
         this._physics3DManger._removeCollider(this._colliderObject, this._collisionFilterGroup, this._collisionFilterMask);
     },
 
     _buildCollider () {
         let colliderObject = this._colliderObject = new ammo.btCollisionObject();
         colliderObject.setUserIndex(this.id);
-        colliderObject.forceActivationState(_DISABLE_SIMULATION);
+        colliderObject.forceActivationState(ActivationState.DISABLE_SIMULATION);
         let flags = colliderObject.getCollisionFlags();
-        if ((flags & _CF_STATIC_OBJECT) !== 0)
-            flags = flags & ~_CF_STATIC_OBJECT;
-        flags=flags | _CF_KINEMATIC_OBJECT;
+        if ((flags & CollisionFlag.STATIC_OBJECT) !== 0)
+            flags = flags & ~ CollisionFlag.STATIC_OBJECT;
+        flags = flags | CollisionFlag.KINEMATIC_OBJECT;
         colliderObject.setCollisionFlags(flags);
-        colliderObject.setCollisionShape(this._compoundShape);
-    },
-
-    /**
-     * !#en destroy all WebAssembly object
-     * !#zh 释放所有 WebAssembly 对象
-     */
-    destroy () {
-        Physics3D.prototype.destroy.call(this);
-        if (this._colliderObject) {
-            ammo.destroy(this._colliderObject);
-            this._colliderObject = null;
-        }
     },
 });
 

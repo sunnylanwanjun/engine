@@ -23,6 +23,10 @@
  ****************************************************************************/
 
 require("./physics3d-manager");
-require("./rigidbody3d-component");
-require("./box3d-collider-component");
-require("./sphere-collider-component");
+require("./compound-shape");
+require("./physics3d-base");
+require("./collider3d");
+require("./rigidbody3d");
+require("./shape/shape3d");
+require("./shape/box-shape");
+require("./shape/sphere-shape");

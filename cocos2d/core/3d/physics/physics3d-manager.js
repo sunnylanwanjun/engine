@@ -50,6 +50,7 @@ let Physics3DManager = cc.Class({
         this._allConvexResultCallback = null;
         
         this._transformList = [];
+        this._physics3DObjectMap = {};
 
         cc.director._scheduler && cc.director._scheduler.enableForTarget(this);
         this.init();
@@ -143,6 +144,23 @@ let Physics3DManager = cc.Class({
         }
     },
 
+    update (dt) {
+        this._updatePhysicsTransfrom();
+        this._simulator(dt);
+        this._updateCollision();
+        this._executeCallback();
+    },
+
+    /// private interface
+
+    _registerPhysics3D (object) {
+        this._physics3DObjectMap[object._id] = object;
+    },
+
+    _unregisterPhysics3D (object) {
+        delete this._physics3DObjectMap[object._id];
+    },
+
     _simulator (dt) {
         if (this._discreteDynamicsWorld) {
             this._discreteDynamicsWorld.stepSimulation(dt, this.maxSubStep, this.fixedTimeStep);
@@ -160,19 +178,89 @@ let Physics3DManager = cc.Class({
         this._transformList.length = 0;
     },
 
-    _udpateCollision () {
+    _updateCollision () {
+        this._collisionsUtils.recoverAllContactPointsPool();
+		var previous=this._currentFrameCollisions;
+		this._currentFrameCollisions=this._previousFrameCollisions;
+		this._currentFrameCollisions.length=0;
+		this._previousFrameCollisions=previous;
+        var loopCount=Stat.loopCount;
+        
+		let numManifolds = this._dispatcher.getNumManifolds();
+		for (let i = 0; i < numManifolds; i++) {
+			let contactManifold = this._dispatcher.getManifoldByIndexInternal(i);
+			let componentA = this._physics3DObjectMap[contactManifold.getBody0().getUserIndex()];
+			let componentB = this._physics3DObjectMap[contactManifold.getBody1().getUserIndex()];
+			let collision = null;
+			let isFirstCollision = false;
+            let contacts = null;
 
+			let isTrigger = componentA.isTrigger || componentB.isTrigger;
+			if (isTrigger && ((componentA.owner)._needProcessTriggers || (componentB.owner)._needProcessTriggers)){
+				var numContacts=contactManifold.getNumContacts();
+				for (var j=0;j < numContacts;j++){
+					var pt=contactManifold.getContactPoint(j);
+					var distance=pt.getDistance();
+					if (distance <=0){
+						collision=this._collisionsUtils.getCollision(componentA,componentB);
+						contacts=collision.contacts;
+						isFirstCollision=collision._updateFrame!==loopCount;
+						if (isFirstCollision){
+							collision._isTrigger=true;
+							contacts.length=0;
+						}
+						break ;
+					}
+				}
+			}else if ((componentA.owner)._needProcessCollisions || (componentB.owner)._needProcessCollisions){
+				if (componentA._enableProcessCollisions || componentB._enableProcessCollisions){
+					numContacts=contactManifold.getNumContacts();
+					for (j=0;j < numContacts;j++){
+						pt=contactManifold.getContactPoint(j);
+						distance=pt.getDistance();
+						if (distance <=0){
+							var contactPoint=this._collisionsUtils.getContactPoints();
+							contactPoint.colliderA=componentA;
+							contactPoint.colliderB=componentB;
+							contactPoint.distance=distance;
+							var nativeNormal=pt.get_m_normalWorldOnB();
+							var normal=contactPoint.normal;
+							normal.x=-nativeNormal.x();
+							normal.y=nativeNormal.y();
+							normal.z=nativeNormal.z();
+							var nativePostionA=pt.get_m_positionWorldOnA();
+							var positionOnA=contactPoint.positionOnA;
+							positionOnA.x=-nativePostionA.x();
+							positionOnA.y=nativePostionA.y();
+							positionOnA.z=nativePostionA.z();
+							var nativePostionB=pt.get_m_positionWorldOnB();
+							var positionOnB=contactPoint.positionOnB;
+							positionOnB.x=-nativePostionB.x();
+							positionOnB.y=nativePostionB.y();
+							positionOnB.z=nativePostionB.z();
+							if (!collision){
+								collision=this._collisionsUtils.getCollision(componentA,componentB);
+								contacts=collision.contacts;
+								isFirstCollision=collision._updateFrame!==loopCount;
+								if (isFirstCollision){
+									collision._isTrigger=false;
+									contacts.length=0;
+								}
+							}
+							contacts.push(contactPoint);
+						}
+					}
+				}
+			}
+			if (collision && isFirstCollision){
+				this._currentFrameCollisions.push(collision);
+				collision._setUpdateFrame(loopCount);
+			}
+		}
     },
 
     _executeCallback () {
 
-    },
-
-    update (dt) {
-        this._updatePhysicsTransfrom();
-        this._simulator(dt);
-        this._udpateCollision();
-        this._executeCallback();
     },
 
     _getCollisionWorld () {

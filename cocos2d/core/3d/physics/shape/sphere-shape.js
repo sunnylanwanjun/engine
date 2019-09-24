@@ -22,7 +22,7 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-let SphereColliderComponent = cc.Class({
+let SphereShape = cc.Class({
     
 });
-module.exports = cc.SphereColliderComponent = SphereColliderComponent;
+module.exports = cc.SphereShape = SphereShape;

@@ -9,5 +9,8 @@
         "node_modules": true,
         ".github": true,
         "bin": true
-    }
+    },
+    "gotoSymbolStack.currentStackPosition": 0,
+    "gotoSymbolStack.maxStackPosition": 0,
+    "gotoSymbolStack.filePositionInfo": []
 }
