@@ -58,6 +58,7 @@ let Physics3DManager = cc.Class({
     },
 
     ctor () {
+        this._frameCount = 0;
         this._debugDrawer = null;
         this._vector3Zero = null;
         this._quaternion = null;
@@ -76,6 +77,8 @@ let Physics3DManager = cc.Class({
 		this._closestConvexResultCallback = null;
         this._allConvexResultCallback = null;
         
+        this._curCollisionInfos = [];
+        this._preCollisionInfos = [];
         this._transformList = [];
         this._physics3DObjectMap = {};
 
@@ -84,6 +87,7 @@ let Physics3DManager = cc.Class({
     },
 
     init (isCollisionOnly) {
+        this._physicsUtils = new cc.Physics3DUtils();
         let vec30 = this._vector3Zero = new ammo.btVector3(0, 0, 0);
 		this._quaternion = new ammo.btQuaternion(0, 0, 0, 1);
 
@@ -173,6 +177,7 @@ let Physics3DManager = cc.Class({
     },
 
     update (dt) {
+        this._frameCount++;
         this._updatePhysicsTransfrom();
         this._simulator(dt);
 
@@ -263,31 +268,32 @@ let Physics3DManager = cc.Class({
     },
 
     _updateCollision () {
-        this._collisionsUtils.recoverAllContactPointsPool();
-		var previous=this._currentFrameCollisions;
-		this._currentFrameCollisions=this._previousFrameCollisions;
-		this._currentFrameCollisions.length=0;
-		this._previousFrameCollisions=previous;
-        var loopCount=Stat.loopCount;
+        this._physicsUtils.resetContactPool();
+		let preCollisionInfos = this._curCollisionInfos;
+		this._curCollisionInfos = this._preCollisionInfos;
+		this._curCollisionInfos.length = 0;
+		this._preCollisionInfos = preCollisionInfos;
         
+        let objectMap = this._physics3DObjectMap;
+
 		let numManifolds = this._dispatcher.getNumManifolds();
 		for (let i = 0; i < numManifolds; i++) {
-			let contactManifold = this._dispatcher.getManifoldByIndexInternal(i);
-			let componentA = this._physics3DObjectMap[contactManifold.getBody0().getUserIndex()];
-			let componentB = this._physics3DObjectMap[contactManifold.getBody1().getUserIndex()];
+			let manifold = this._dispatcher.getManifoldByIndexInternal(i);
+			let collider1 = objectMap[manifold.getBody0().getUserIndex()];
+			let collider2 = objectMap[manifold.getBody1().getUserIndex()];
 			let collision = null;
 			let isFirstCollision = false;
             let contacts = null;
 
-			let isTrigger = componentA.isTrigger || componentB.isTrigger;
-			if (isTrigger && ((componentA.owner)._needProcessTriggers || (componentB.owner)._needProcessTriggers)){
-				var numContacts=contactManifold.getNumContacts();
-				for (var j=0;j < numContacts;j++){
-					var pt=contactManifold.getContactPoint(j);
-					var distance=pt.getDistance();
-					if (distance <=0){
-						collision=this._collisionsUtils.getCollision(componentA,componentB);
-						contacts=collision.contacts;
+			let isTrigger = collider1.isTrigger || collider2.isTrigger;
+			if (isTrigger) {
+				let numContacts = manifold.getNumContacts();
+				for (let j = 0; j < numContacts; j++) {
+					let pt = manifold.getContactPoint(j);
+					let distance = pt.getDistance();
+					if (distance <= 0) {
+						collision = this._physicsUtils.getCollisionInfo(collider1, collider2);
+						contacts = collision.contacts;
 						isFirstCollision=collision._updateFrame!==loopCount;
 						if (isFirstCollision){
 							collision._isTrigger=true;
@@ -298,9 +304,9 @@ let Physics3DManager = cc.Class({
 				}
 			}else if ((componentA.owner)._needProcessCollisions || (componentB.owner)._needProcessCollisions){
 				if (componentA._enableProcessCollisions || componentB._enableProcessCollisions){
-					numContacts=contactManifold.getNumContacts();
+					numContacts=manifold.getNumContacts();
 					for (j=0;j < numContacts;j++){
-						pt=contactManifold.getContactPoint(j);
+						pt=manifold.getContactPoint(j);
 						distance=pt.getDistance();
 						if (distance <=0){
 							var contactPoint=this._collisionsUtils.getContactPoints();

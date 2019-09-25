@@ -22,8 +22,9 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-require("./physics3d-manager");
+require("./contact3d");
 require("./physics3d-utils");
+require("./physics3d-manager");
 require("./compound-shape");
 require("./physics3d-base");
 require("./collider3d");
