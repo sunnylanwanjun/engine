@@ -185,7 +185,6 @@ let Physics3DBase = cc.Class({
         this._colliderObject = null;
         this._colliderShape = new cc.CompoundShape();
 
-        this._enableProcessCollisions = true;
         this._collisionFilterGroup = 1 << 0;
         this._collisionFilterMask = 1 << 0;
 

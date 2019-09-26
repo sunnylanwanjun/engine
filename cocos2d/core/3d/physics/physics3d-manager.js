@@ -23,6 +23,12 @@
  ****************************************************************************/
 let ammo = require("./lib/ammo");
 
+let _ammoToCCVec3 = function (ammoVec3, ccVec3) {
+    ccVec3.x = ammoVec3.x();
+    ccVec3.y = ammoVec3.y();
+    ccVec3.z = ammoVec3.z();
+};
+
 let Physics3DManager = cc.Class({
     name: 'cc.Physics3DManager',
 
@@ -186,7 +192,7 @@ let Physics3DManager = cc.Class({
         }
 
         this._updateCollision();
-        this._executeCallback();
+        this._handleCollisionEvent();
     },
 
     /// private interface
@@ -273,84 +279,228 @@ let Physics3DManager = cc.Class({
 		this._curCollisionInfos = this._preCollisionInfos;
 		this._curCollisionInfos.length = 0;
 		this._preCollisionInfos = preCollisionInfos;
-        
         let objectMap = this._physics3DObjectMap;
 
 		let numManifolds = this._dispatcher.getNumManifolds();
-		for (let i = 0; i < numManifolds; i++) {
-			let manifold = this._dispatcher.getManifoldByIndexInternal(i);
+		for (let manifoldIdx = 0; manifoldIdx < numManifolds; manifoldIdx++) {
+			let manifold = this._dispatcher.getManifoldByIndexInternal(manifoldIdx);
 			let collider1 = objectMap[manifold.getBody0().getUserIndex()];
 			let collider2 = objectMap[manifold.getBody1().getUserIndex()];
-			let collision = null;
-			let isFirstCollision = false;
+			let collisionInfo = null;
             let contacts = null;
+            let isNewCollision = false;
 
-			let isTrigger = collider1.isTrigger || collider2.isTrigger;
+            let isTrigger = collider1.isTrigger || collider2.isTrigger;
+            let needHandleCollisions = collider1._needHandleCollisions || collider2._needHandleCollisions;
 			if (isTrigger) {
 				let numContacts = manifold.getNumContacts();
-				for (let j = 0; j < numContacts; j++) {
-					let pt = manifold.getContactPoint(j);
+				for (let contactIdx = 0; contactIdx < numContacts; contactIdx++) {
+					let pt = manifold.getContactPoint(contactIdx);
 					let distance = pt.getDistance();
-					if (distance <= 0) {
-						collision = this._physicsUtils.getCollisionInfo(collider1, collider2);
-						contacts = collision.contacts;
-						isFirstCollision=collision._updateFrame!==loopCount;
-						if (isFirstCollision){
-							collision._isTrigger=true;
-							contacts.length=0;
-						}
-						break ;
-					}
+					if (distance > 0) continue;
+                    collisionInfo = this._physicsUtils.getCollisionInfo(collider1, collider2);
+                    // Avoid get same collision info in one loop, or same collision will be pushed into container twice
+                    isNewCollision = collisionInfo._currentFrameCount != this._frameCount;
+                    if (isNewCollision) {                        
+                        collisionInfo.contacts.length = 0;
+                        collisionInfo._isTrigger = true;
+                    }
+                    break;
 				}
-			}else if ((componentA.owner)._needProcessCollisions || (componentB.owner)._needProcessCollisions){
-				if (componentA._enableProcessCollisions || componentB._enableProcessCollisions){
-					numContacts=manifold.getNumContacts();
-					for (j=0;j < numContacts;j++){
-						pt=manifold.getContactPoint(j);
-						distance=pt.getDistance();
-						if (distance <=0){
-							var contactPoint=this._collisionsUtils.getContactPoints();
-							contactPoint.colliderA=componentA;
-							contactPoint.colliderB=componentB;
-							contactPoint.distance=distance;
-							var nativeNormal=pt.get_m_normalWorldOnB();
-							var normal=contactPoint.normal;
-							normal.x=-nativeNormal.x();
-							normal.y=nativeNormal.y();
-							normal.z=nativeNormal.z();
-							var nativePostionA=pt.get_m_positionWorldOnA();
-							var positionOnA=contactPoint.positionOnA;
-							positionOnA.x=-nativePostionA.x();
-							positionOnA.y=nativePostionA.y();
-							positionOnA.z=nativePostionA.z();
-							var nativePostionB=pt.get_m_positionWorldOnB();
-							var positionOnB=contactPoint.positionOnB;
-							positionOnB.x=-nativePostionB.x();
-							positionOnB.y=nativePostionB.y();
-							positionOnB.z=nativePostionB.z();
-							if (!collision){
-								collision=this._collisionsUtils.getCollision(componentA,componentB);
-								contacts=collision.contacts;
-								isFirstCollision=collision._updateFrame!==loopCount;
-								if (isFirstCollision){
-									collision._isTrigger=false;
-									contacts.length=0;
-								}
-							}
-							contacts.push(contactPoint);
-						}
-					}
-				}
-			}
-			if (collision && isFirstCollision){
-				this._currentFrameCollisions.push(collision);
-				collision._setUpdateFrame(loopCount);
+			} else if (needHandleCollisions) {
+                let numContacts=manifold.getNumContacts();
+                for (let contactIdx = 0; contactIdx < numContacts; contactIdx++) {
+                    let pt = manifold.getContactPoint(contactIdx);
+                    let distance = pt.getDistance();
+                    if (distance > 0) continue;
+                    let contact = this._physicsUtils.getContact();
+                    contact.colliderA = collider1;
+                    contact.colliderB = collider2;
+                    contact.distance = distance;
+                    let ammoNormal = pt.get_m_normalWorldOnB();
+                    _ammoToCCVec3(ammoNormal, contact._normal);
+                    let ammoPostion1 = pt.get_m_positionWorldOnA();
+                    _ammoToCCVec3(ammoPostion1, contact._position1);
+                    let ammoPostion2 = pt.get_m_positionWorldOnB();
+                    _ammoToCCVec3(ammoPostion2, contact._position2);
+                    if (!collisionInfo) {
+                        collisionInfo = this._physicsUtils.getCollisionInfo(collider1, collider2);
+                        contacts = collisionInfo.contacts;
+                        // Avoid get same collision info in one loop, or same collision will be pushed into container twice
+                        isNewCollision = collisionInfo._currentFrameCount !== this._frameCount;
+                        if (isNewCollision) {
+                            collisionInfo._isTrigger = false;
+                            contacts.length = 0;
+                        }
+                    }
+                    contacts.push(contact);
+                }
+            }
+			if (collisionInfo && isNewCollision){
+				this._curCollisionInfos.push(collisionInfo);
+				collisionInfo.setFrameCount(this._frameCount);
 			}
 		}
     },
 
-    _executeCallback () {
+    _invokeComponentFunc (funcName, funcParam) {
+        
+    },
 
+    _handleCollisionEvent () {
+        let frameCount = this._frameCount;
+        let curCollisionInfos = this._curCollisionInfos;
+        let preCollisionInfos = this._preCollisionInfos;
+
+        /*
+
+        let comps1 = collider1.node._components;
+        let comps2 = collider2.node._components;
+
+        let i, l, comp;
+        for (i = 0, l = comps1.length; i < l; i++) {
+            comp = comps1[i];
+            if (comp[contactFunc]) {
+                comp[contactFunc](collider2, collider1);
+            }
+        }
+
+        for (i = 0, l = comps2.length; i < l; i++) {
+            comp = comps2[i];
+            if (comp[contactFunc]) {
+                comp[contactFunc](collider1, collider2);
+            }
+        }
+
+        */
+
+		for (let i = 0, n = curCollisionInfos.length; i < n; i++){
+			let collisionInfo = curCollisionInfos[i];
+			let collider1 = collisionInfo._collider1;
+			let collider2 = collisionInfo._collider2;
+			if (!collider1.isValid && !collider2.isValid) {
+                continue;
+            }
+
+            let comps1 = collider1.node._components;
+            let comps2 = collider2.node._components;
+
+			if (frameCount - collisionInfo._currentFrameCount === 1) {
+				let ownerA = collider1.owner;
+				let scriptsA=ownerA._scripts;
+				if (scriptsA) {
+					if (collisionInfo._isTrigger) {
+                        if (ownerA._needProcessTriggers) {
+                            for (let j=0,m=scriptsA.length;j < m;j++)
+                            scriptsA[j].onTriggerStay(collider2);
+                        }
+                    }else {
+                        if (ownerA._needProcessCollisions){
+                            for (j=0,m=scriptsA.length;j < m;j++){
+                                collisionInfo.other=collider2;
+                                scriptsA[j].onCollisionStay(collisionInfo);
+                            }
+                        }
+					}
+				};
+				let ownerB=collider2.owner;
+				let scriptsB=ownerB._scripts;
+				if (scriptsB){
+					if (collisionInfo._isTrigger){
+						if (ownerB._needProcessTriggers){
+							for (j=0,m=scriptsB.length;j < m;j++)
+							scriptsB[j].onTriggerStay(collider1);
+						}
+						}else {
+						if (ownerB._needProcessCollisions){
+							for (j=0,m=scriptsB.length;j < m;j++){
+								collisionInfo.other=collider1;
+								scriptsB[j].onCollisionStay(collisionInfo);
+							}
+						}
+					}
+				}
+				}else {
+				ownerA=collider1.owner;
+				scriptsA=ownerA._scripts;
+				if (scriptsA){
+					if (collisionInfo._isTrigger){
+						if (ownerA._needProcessTriggers){
+							for (j=0,m=scriptsA.length;j < m;j++)
+							scriptsA[j].onTriggerEnter(collider2);
+						}
+						}else {
+						if (ownerA._needProcessCollisions){
+							for (j=0,m=scriptsA.length;j < m;j++){
+								collisionInfo.other=collider2;
+								scriptsA[j].onCollisionEnter(collisionInfo);
+							}
+						}
+					}
+				}
+				ownerB=collider2.owner;
+				scriptsB=ownerB._scripts;
+				if (scriptsB){
+					if (collisionInfo._isTrigger){
+						if (ownerB._needProcessTriggers){
+							for (j=0,m=scriptsB.length;j < m;j++)
+							scriptsB[j].onTriggerEnter(collider1);
+						}
+						}else {
+						if (ownerB._needProcessCollisions){
+							for (j=0,m=scriptsB.length;j < m;j++){
+								collisionInfo.other=collider1;
+								scriptsB[j].onCollisionEnter(collisionInfo);
+							}
+						}
+					}
+				}
+			}
+		}
+		for (i=0,n=this._previousFrameCollisions.length;i < n;i++){
+			let preFrameCol=this._previousFrameCollisions[i];
+			let preColliderA=preFrameCol._colliderA;
+			let preColliderB=preFrameCol._colliderB;
+			if (preColliderA.destroyed || preColliderB.destroyed)
+				continue ;
+			if (loopCount-preFrameCol._updateFrame===1){
+				this._collisionsUtils.recoverCollision(preFrameCol);
+				ownerA=preColliderA.owner;
+				scriptsA=ownerA._scripts;
+				if (scriptsA){
+					if (preFrameCol._isTrigger){
+						if (ownerA._needProcessTriggers){
+							for (j=0,m=scriptsA.length;j < m;j++)
+							scriptsA[j].onTriggerExit(preColliderB);
+						}
+						}else {
+						if (ownerA._needProcessCollisions){
+							for (j=0,m=scriptsA.length;j < m;j++){
+								preFrameCol.other=preColliderB;
+								scriptsA[j].onCollisionExit(preFrameCol);
+							}
+						}
+					}
+				}
+				ownerB=preColliderB.owner;
+				scriptsB=ownerB._scripts;
+				if (scriptsB){
+					if (preFrameCol._isTrigger){
+						if (ownerB._needProcessTriggers){
+							for (j=0,m=scriptsB.length;j < m;j++)
+							scriptsB[j].onTriggerExit(preColliderA);
+						}
+						}else {
+						if (ownerB._needProcessCollisions){
+							for (j=0,m=scriptsB.length;j < m;j++){
+								preFrameCol.other=preColliderA;
+								scriptsB[j].onCollisionExit(preFrameCol);
+							}
+						}
+					}
+				}
+			}
+		}
     },
 
     _getCollisionWorld () {
