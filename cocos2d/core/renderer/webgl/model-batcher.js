@@ -34,6 +34,7 @@ let idGenerater = new (require('../../platform/id-generater'))('VertextFormat');
 import InputAssembler from '../../../renderer/core/input-assembler';
 import RecyclePool from '../../../renderer/memop/recycle-pool';
 import Model from '../../../renderer/scene/model';
+import DataTextureBuffer from '../../utils/data-texture-buffer';
 
 let _buffers = {};
 
@@ -63,6 +64,9 @@ var ModelBatcher = function (device, renderScene) {
     this._quadBuffer3D = this.getBuffer('quad', vfmt3D);
     this._meshBuffer3D = this.getBuffer('mesh', vfmt3D);
     this._buffer = this._meshBuffer;
+
+    // for gpu batch
+    this.matrixBuffer = new DataTextureBuffer();
 
     this._batchedModels = [];
     this._dummyNode = new cc.Node();
@@ -101,6 +105,8 @@ ModelBatcher.prototype = {
             _buffers[key].reset();
         }
         this._buffer = this._meshBuffer;
+
+        this.matrixBuffer.reset();
 
         // reset caches for handle render components
         this.node = this._dummyNode;
@@ -196,6 +202,9 @@ ModelBatcher.prototype = {
             _buffers[key].uploadData();
         }
     
+        // for gpu batch
+        this.matrixBuffer.uploadData();
+
         this.walking = false;
     },
 
@@ -221,7 +230,7 @@ ModelBatcher.prototype = {
         }
 
         return buffer;
-    }
+    },
 }
 
 module.exports = ModelBatcher;
