@@ -262,11 +262,17 @@ export default class ParticleSystem3DAssembler extends Assembler {
             }
         }
 
-        this._model.updateIA(0, this._particles.length * this._model._indexCount, true);
+        this.updateIA(0, this._particles.length * this._model._indexCount, true);
     }
 
     updateShaderUniform () {
 
+    }
+
+    updateIA (index, count, vDirty, iDirty) {
+        if (!this._model) return;
+
+        this._model.updateIA(index, count, vDirty, iDirty);
     }
 
     getParticleCount () {
@@ -327,6 +333,8 @@ export default class ParticleSystem3DAssembler extends Assembler {
             mat = MaterialVariant.create(mat, this._particleSystem);
         }
 
+        mat = this._particleSystem.setMaterial(0, mat);
+
         if (this._particleSystem._simulationSpace === Space.World) {
             mat.define(CC_USE_WORLD_SPACE, true);
         } else {
@@ -374,8 +382,6 @@ export default class ParticleSystem3DAssembler extends Assembler {
         }
 
         mat.setProperty('frameTile_velLenScale', this.frameTile_velLenScale);
-
-        this._particleSystem.setMaterial(0, mat);
     }
 
     _updateTrailMaterial () {
