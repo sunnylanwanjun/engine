@@ -14,6 +14,7 @@ import { CCArmatureDisplay } from './CCArmatureDisplay';
 import { MeshRenderData } from '../core/renderer/ui/render-data';
 import { UI } from '../core/renderer/ui/ui';
 import { MaterialInstance } from '../core/renderer/core/material-instance';
+import { legacyCC } from '../core/global-exports';
 
 enum DefaultArmaturesEnum {
     default = -1,
@@ -1277,3 +1278,5 @@ export class ArmatureDisplay extends UIRenderable {
         }
     }
 }
+
+legacyCC.internal.ArmatureDisplay = ArmatureDisplay;

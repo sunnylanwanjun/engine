@@ -7,6 +7,7 @@ import { ArmatureFrame, ArmatureFrameColor } from '../ArmatureCache';
 import { ArmatureDisplay, ArmatureDisplayMeshData } from '../ArmatureDisplay';
 import { CCSlot } from '../CCSlot';
 import { Armature, BlendMode } from '../lib/dragonBones.js';
+import { legacyCC } from '../../core/global-exports';
 
 const NEED_COLOR = 0x01;
 const NEED_BATCH = 0x10;
@@ -455,3 +456,5 @@ function updateComponentRenderData (comp: ArmatureDisplay, ui: UI) {
     _ui = undefined;
     _comp = undefined;
 }
+
+legacyCC.internal.DragonBonesAssembler = simple;
